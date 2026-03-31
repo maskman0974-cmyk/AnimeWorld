@@ -24,6 +24,7 @@
 #define BAR_RED      0x001F
 #define BAR_BLUE     0x7C00
 
+extern void waitVBlank(); 
 extern void initGraphicsMode3(void);
 extern void drawPixel(int x, int y, uint16_t color);
 extern void drawText(char* text, int x, int y, uint16_t color);
@@ -38,10 +39,16 @@ extern int regio;
 extern int regio_stage[]; 
 
 extern Karakter vijand_team[6];
+extern Karakter pcBox[30];
 extern int activeEnemyIdx;
 extern char* itemNamen[];
 extern int itemHeal[];
 extern int itemAantal[];
+
+extern bool checkEvolutie(Karakter* k);
+extern void checkNewMoves(Karakter* k);
+extern int getEmptyPcSlot(void);
+extern int getEmptyPartySlot(void);
 
 int bState = 0; 
 int prevState = -1; 
@@ -51,18 +58,29 @@ int bMenu = 0;
 int bMoveSelect = 0; 
 int teamSelect = 0; 
 int bBagCursor = 0; 
+bool justLeveledUp = false;
+bool justEvolved = false;
 
 int pOffX = 0; 
 int eOffX = 0;
 bool pVis = true;
 bool eVis = true;
 
+// NIEUW: Voor tekst pop-ups over Effectiviteit en Passives
+int typeModifierText = 0; // 0=Normaal, 1=Super, 2=Zwak
+bool passiveTriggered = false;
+
+// --- ELEMENT SYSTEM (0=Normal, 1=Ki, 2=Chakra, 3=Haki, 4=Devil Fruit) ---
+int getBaseType(int char_id) {
+    if (char_id == 3 || char_id == 5) return 1; // Ki (Goku, Vegeta)
+    if (char_id == 4 || char_id == 7 || char_id == 8 || char_id == 9 || char_id == 10) return 2; // Chakra
+    if (char_id == 1 || char_id == 6) return 3; // Haki (Zoro, Shanks)
+    if (char_id == 0 || char_id == 2) return 4; // DF (Luffy, Kaido)
+    return 0;
+}
+
 void drawRect(int x, int y, int w, int h, uint16_t color) {
-    for(int r = 0; r < h; r++) {
-        for(int c = 0; c < w; c++) {
-            drawPixel(x + c, y + r, color);
-        }
-    }
+    for(int r = 0; r < h; r++) for(int c = 0; c < w; c++) drawPixel(x + c, y + r, color);
 }
 
 void drawBitmapSprite(int x, int y, int width, int height, const uint16_t* data) {
@@ -70,9 +88,7 @@ void drawBitmapSprite(int x, int y, int width, int height, const uint16_t* data)
     for (int r = 0; r < height; r++) {
         for (int c = 0; c < width; c++) {
             uint16_t color = data[r * width + c];
-            if (color != transColor && color != 0x7C1F && color != 0x0000) { 
-                drawPixel(x + c, y + r, color);
-            }
+            if (color != transColor && color != 0x7C1F && color != 0x0000) drawPixel(x + c, y + r, color);
         }
     }
 }
@@ -97,26 +113,26 @@ void drawBar(int x, int y, int w, int h, int val, int max, uint16_t color) {
 }
 
 void drawBattleUI() {
-    drawUIBox(4, 8, 118, 34); 
+    drawUIBox(6, 8, 118, 34); 
     drawText(vijand_team[activeEnemyIdx].naam, 10, 12, COLOR_WHITE);
-    drawText("LVL", 92, 12, COLOR_GOLD); 
-    drawNumber(vijand_team[activeEnemyIdx].lvl, 110, 12, COLOR_GOLD);
+    drawText("LVL", 88, 12, COLOR_GOLD); 
+    drawNumber(vijand_team[activeEnemyIdx].lvl, 108, 12, COLOR_GOLD);
     
     uint16_t vColor = BAR_GREEN;
     if (vijand_team[activeEnemyIdx].hp < vijand_team[activeEnemyIdx].max_hp / 2) vColor = BAR_YELLOW;
     if (vijand_team[activeEnemyIdx].hp < vijand_team[activeEnemyIdx].max_hp / 5) vColor = BAR_RED;
-    drawBar(10, 25, 106, 5, vijand_team[activeEnemyIdx].hp, vijand_team[activeEnemyIdx].max_hp, vColor);
+    drawBar(12, 25, 100, 5, vijand_team[activeEnemyIdx].hp, vijand_team[activeEnemyIdx].max_hp, vColor);
     
-    drawUIBox(118, 68, 118, 42); 
-    drawText(team[activeIdx].naam, 124, 72, COLOR_WHITE);
+    drawUIBox(116, 68, 120, 42); 
+    drawText(team[activeIdx].naam, 120, 72, COLOR_WHITE);
     drawText("LVL", 195, 72, COLOR_GOLD); 
     drawNumber(team[activeIdx].lvl, 215, 72, COLOR_GOLD);
     
     uint16_t pColor = BAR_GREEN;
     if (team[activeIdx].hp < team[activeIdx].max_hp / 2) pColor = BAR_YELLOW;
     if (team[activeIdx].hp < team[activeIdx].max_hp / 5) pColor = BAR_RED;
-    drawBar(124, 85, 105, 5, team[activeIdx].hp, team[activeIdx].max_hp, pColor);
-    drawBar(124, 94, 105, 2, team[activeIdx].xp, team[activeIdx].xp_nodig, BAR_BLUE);
+    drawBar(120, 85, 105, 5, team[activeIdx].hp, team[activeIdx].max_hp, pColor);
+    drawBar(120, 94, 105, 2, team[activeIdx].xp, team[activeIdx].xp_nodig, BAR_BLUE);
 }
 
 void drawVFX() {
@@ -137,6 +153,7 @@ void drawVFX() {
 }
 
 void redrawBattleScene() {
+    waitVBlank(); 
     *(volatile uint32_t*)0x040000D4 = (uint32_t)battle_bgBitmap;
     *(volatile uint32_t*)0x040000D8 = (uint32_t)0x06000000;
     *(volatile uint32_t*)0x040000DC = 0x80000000 | 0x04000000 | 19200; 
@@ -151,23 +168,54 @@ void redrawBattleScene() {
     }
 }
 
-int calculateDamage(Karakter* attacker, Move* m) {
-    return (m->kracht * attacker->lvl) / 5 + (attacker->lvl * 2);
+// V2.5 AANGEPAST: Inclusief Type Matchups & Damage Passives
+int calculateDamage(Karakter* attacker, Karakter* defender, Move* m) {
+    int dmg = (m->kracht * attacker->lvl) / 5 + (attacker->lvl * 2);
+    
+    // Type Matchups (Steen-Papier-Schaar)
+    int atkType = m->effectChance; // Nu gebruikt als Type!
+    int defType = getBaseType(defender->char_id);
+    typeModifierText = 0;
+
+    if (atkType > 0 && defType > 0) {
+        // Ki (1) > Chakra (2) > Devil Fruit (4) > Haki (3) > Ki (1)
+        if ((atkType == 1 && defType == 2) || (atkType == 2 && defType == 4) || 
+            (atkType == 4 && defType == 3) || (atkType == 3 && defType == 1)) {
+            dmg = (dmg * 15) / 10; // 1.5x Damage
+            typeModifierText = 1; // SUPER
+        }
+        else if ((atkType == 2 && defType == 1) || (atkType == 4 && defType == 2) || 
+                 (atkType == 3 && defType == 4) || (atkType == 1 && defType == 3)) {
+            dmg = (dmg * 5) / 10; // 0.5x Damage
+            typeModifierText = 2; // WEAK
+        }
+    }
+
+    // Passives (Zenkai Boost voor Saiyans)
+    if ((attacker->char_id == 3 || attacker->char_id == 5) && attacker->hp < (attacker->max_hp / 3)) {
+        dmg = (dmg * 15) / 10;
+        passiveTriggered = true;
+    }
+    // Passives (Crit Chance voor Zwaardvechters)
+    if ((attacker->char_id == 1 || attacker->char_id == 6) && (rand() % 100) < 20) {
+        dmg = dmg * 2;
+        passiveTriggered = true;
+    }
+
+    return dmg;
 }
 
 void startBattle(bool isStory) {
     bBoss = isStory; bState = 0; prevState = -1; bTimer = 60; bMenu = 0; bMoveSelect = 0; teamSelect = 0; bBagCursor = 0;
     pOffX = 0; eOffX = 0; pVis = true; eVis = true;
+    justLeveledUp = false; justEvolved = false;
 
     activeEnemyIdx = 0;
     for(int i=0; i<6; i++) vijand_team[i].isGevuld = false;
 
     if (isStory) {
         int stage = regio_stage[regio];
-        
-        // DE BALANS FIX: Lvl 7 in plaats van Lvl 18 voor baas 1.
         int baseLvl = 3 + (regio * 10) + (stage * 2); 
-        
         for(int i = 0; i < stage; i++) {
             int random_minion_id = rand() % 11; 
             initKarakter(&vijand_team[i], random_minion_id, baseLvl + i); 
@@ -176,6 +224,7 @@ void startBattle(bool isStory) {
         if (lastSlot > 5) lastSlot = 5;
         initKarakter(&vijand_team[lastSlot], interactie_npc, baseLvl + 2); 
     } else {
+        int baseLvl = 3 + (regio * 10) + (regio_stage[regio] * 2);
         int wild_id = 1; 
         if (regio == 0)      wild_id = (rand() % 2 == 0) ? 0 : 1; 
         else if (regio == 1) wild_id = (rand() % 2 == 0) ? 0 : 6; 
@@ -183,7 +232,7 @@ void startBattle(bool isStory) {
         else if (regio == 3) wild_id = (rand() % 3 == 0) ? 4 : (rand()%2==0?8:10); 
         else if (regio == 4) wild_id = (rand() % 2 == 0) ? 9 : 7; 
         
-        int lvl = team[activeIdx].lvl + ((rand() % 3) - 1);
+        int lvl = baseLvl + ((rand() % 3) - 1);
         if (lvl < 1) lvl = 1;
         initKarakter(&vijand_team[0], wild_id, lvl); 
     }
@@ -227,22 +276,18 @@ bool updateBattle() {
         if (stateChanged) drawTextBox("CHOOSE ATTACK:", ""); 
         for(int i = 0; i < 4; i++) {
             uint16_t color = (bMoveSelect == i) ? COLOR_RED : COLOR_WHITE;
-            if (team[activeIdx].lvl >= team[activeIdx].moves[i].minLvl) {
+            if (strcmp(team[activeIdx].moves[i].naam, "-") != 0) {
                 drawText(team[activeIdx].moves[i].naam, 20 + (i%2)*100, 130 + (i/2)*15, color);
             } else {
-                drawText("LOCKED", 20 + (i%2)*100, 130 + (i/2)*15, 0x3DEF); 
+                drawText("---", 20 + (i%2)*100, 130 + (i/2)*15, 0x3DEF); 
             }
         }
-        
         if (isKeyJustPressed(KEY_RIGHT)) { bMoveSelect++; if (bMoveSelect > 3) bMoveSelect = 0; }
         if (isKeyJustPressed(KEY_LEFT))  { bMoveSelect--; if (bMoveSelect < 0) bMoveSelect = 3; }
         if (isKeyJustPressed(KEY_DOWN))  { bMoveSelect += 2; if (bMoveSelect > 3) bMoveSelect -= 4; }
         if (isKeyJustPressed(KEY_UP))    { bMoveSelect -= 2; if (bMoveSelect < 0) bMoveSelect += 4; }
-
         if (isKeyJustPressed(KEY_A)) {
-            if (team[activeIdx].lvl >= team[activeIdx].moves[bMoveSelect].minLvl && team[activeIdx].moves[bMoveSelect].kracht > 0) {
-                bState = 2; bTimer = 40;
-            }
+            if (strcmp(team[activeIdx].moves[bMoveSelect].naam, "-") != 0) { bState = 2; bTimer = 40; }
         }
         if (isKeyJustPressed(KEY_B)) { bState = 1; } 
     }
@@ -255,16 +300,14 @@ bool updateBattle() {
             uint16_t color = (bBagCursor == i) ? COLOR_RED : COLOR_WHITE;
             if (itemAantal[i] <= 0) color = 0x3DEF; 
             drawText(itemNamen[i], 30, 30 + (i * 15), color);
-            drawText("x", 170, 30 + (i * 15), color);
-            drawNumber(itemAantal[i], 180, 30 + (i * 15), color);
+            drawText("x", 170, 30 + (i * 15), color); drawNumber(itemAantal[i], 180, 30 + (i * 15), color);
         }
         if (isKeyJustPressed(KEY_DOWN)) { bBagCursor = (bBagCursor + 1) % 4; redrawBattleScene(); }
         if (isKeyJustPressed(KEY_UP)) { bBagCursor = (bBagCursor + 3) % 4; redrawBattleScene(); }
         if (isKeyJustPressed(KEY_A)) {
             if (itemAantal[bBagCursor] > 0) {
                 if (bBagCursor == 3) { 
-                    if (getEmptyPartySlot() == -1) { bState = 6; bTimer = 60; } 
-                    else { itemAantal[3]--; bState = 7; bTimer = 60; }
+                    itemAantal[3]--; bState = 7; bTimer = 60; 
                 } else if (itemHeal[bBagCursor] > 0) { 
                     itemAantal[bBagCursor]--; team[activeIdx].hp += itemHeal[bBagCursor];
                     if (team[activeIdx].hp > team[activeIdx].max_hp) team[activeIdx].hp = team[activeIdx].max_hp;
@@ -276,8 +319,7 @@ bool updateBattle() {
     }
     else if (bState == 15) { 
         if (stateChanged) { redrawBattleScene(); drawTextBox(team[activeIdx].naam, "RECOVERED HP!"); }
-        bTimer--;
-        if (bTimer <= 0) { bState = 3; bTimer = 60; } 
+        bTimer--; if (bTimer <= 0) { bState = 3; bTimer = 60; } 
     }
     else if (bState == 7) { 
         if (stateChanged) { redrawBattleScene(); drawTextBox("YOU THREW A", "CAPTURE NET!"); }
@@ -296,17 +338,22 @@ bool updateBattle() {
         }
     }
     else if (bState == 8) { 
-        if (stateChanged) drawTextBox("GOTCHA!", "CHARACTER CAUGHT!");
-        bTimer--;
-        if (bTimer <= 0) { team[getEmptyPartySlot()] = vijand_team[activeEnemyIdx]; return true; }
+        if (stateChanged) {
+            if (getEmptyPartySlot() != -1) { drawTextBox("GOTCHA! SENT TO", "PARTY!"); team[getEmptyPartySlot()] = vijand_team[activeEnemyIdx]; } 
+            else if (getEmptyPcSlot() != -1) { drawTextBox("GOTCHA! SENT TO", "PC BOX!"); pcBox[getEmptyPcSlot()] = vijand_team[activeEnemyIdx]; } 
+            else { drawTextBox("PC BOX IS FULL!", "RELEASED..."); }
+        }
+        bTimer--; if (bTimer <= 0) { return true; }
     }
     else if (bState == 9) { 
         if (stateChanged) drawTextBox(bBoss ? "YOU CAN'T CATCH" : "OH NO!", bBoss ? "A BOSS!" : "IT BROKE FREE!");
-        bTimer--;
-        if (bTimer <= 0) { bState = 3; bTimer = 40; } 
+        bTimer--; if (bTimer <= 0) { bState = 3; bTimer = 40; } 
     }
-    else if (bState == 2) { 
-        if (stateChanged) drawTextBox(team[activeIdx].naam, team[activeIdx].moves[bMoveSelect].naam);
+    else if (bState == 2) { // SPELER AANVAL MET NIEUWE EFFECTEN
+        if (stateChanged) {
+            passiveTriggered = false; typeModifierText = 0;
+            drawTextBox(team[activeIdx].naam, team[activeIdx].moves[bMoveSelect].naam);
+        }
         if (bTimer == 35) { pOffX = 15; redrawBattleScene(); } 
         if (bTimer == 25) { pOffX = 0; redrawBattleScene(); } 
         if (bTimer == 15) { eVis = false; redrawBattleScene(); } 
@@ -316,31 +363,46 @@ bool updateBattle() {
         bTimer--;
         if (bTimer <= 0) {
             eVis = true; 
-            int damage = calculateDamage(&team[activeIdx], &team[activeIdx].moves[bMoveSelect]);
+            int damage = calculateDamage(&team[activeIdx], &vijand_team[activeEnemyIdx], &team[activeIdx].moves[bMoveSelect]);
             vijand_team[activeEnemyIdx].hp -= damage;
             if (vijand_team[activeEnemyIdx].hp < 0) vijand_team[activeEnemyIdx].hp = 0;
             redrawBattleScene(); 
-            bState = 3; bTimer = 60;
+            
+            if (typeModifierText == 1) { bState = 20; bTimer = 40; } // SUPER EFFECTIVE
+            else if (typeModifierText == 2) { bState = 21; bTimer = 40; } // NOT EFFECTIVE
+            else if (passiveTriggered) { bState = 22; bTimer = 40; } // PASSIVE TRIGGER
+            else { bState = 3; bTimer = 60; }
         }
     }
-    else if (bState == 3) { 
+    else if (bState == 20) { // SUPER EFFECTIVE TEXT
+        if (stateChanged) drawTextBox("IT'S SUPER", "EFFECTIVE!");
+        bTimer--; if (bTimer <= 0) { bState = 3; bTimer = 60; }
+    }
+    else if (bState == 21) { // NOT EFFECTIVE TEXT
+        if (stateChanged) drawTextBox("IT'S NOT VERY", "EFFECTIVE...");
+        bTimer--; if (bTimer <= 0) { bState = 3; bTimer = 60; }
+    }
+    else if (bState == 22) { // PASSIVE TEXT
+        if (stateChanged) drawTextBox("PASSIVE ABILITY", "TRIGGERED!");
+        bTimer--; if (bTimer <= 0) { bState = 3; bTimer = 60; }
+    }
+    else if (bState == 3) { // VIJAND AANVAL
         if (vijand_team[activeEnemyIdx].hp <= 0) {
             int nextIdx = -1;
-            for(int i = activeEnemyIdx + 1; i < 6; i++) {
-                if (vijand_team[i].isGevuld && vijand_team[i].hp > 0) { nextIdx = i; break; }
-            }
+            for(int i = activeEnemyIdx + 1; i < 6; i++) { if (vijand_team[i].isGevuld && vijand_team[i].hp > 0) { nextIdx = i; break; } }
             if (nextIdx != -1) {
                 activeEnemyIdx = nextIdx;
                 if (stateChanged) drawTextBox("ENEMY SENT OUT", vijand_team[activeEnemyIdx].naam);
-                bTimer--;
-                if (bTimer <= 0) { bState = 1; redrawBattleScene(); }
+                bTimer--; if (bTimer <= 0) { bState = 1; redrawBattleScene(); }
             } else {
                 if (stateChanged) drawTextBox("ALL ENEMIES DEFEATED!", "YOU WIN!");
-                bTimer--;
-                if (bTimer <= 0) { bState = 11; bTimer = 60; } 
+                bTimer--; if (bTimer <= 0) { bState = 11; bTimer = 60; } 
             }
         } else {
-            if (stateChanged) drawTextBox(vijand_team[activeEnemyIdx].naam, vijand_team[activeEnemyIdx].moves[0].naam);
+            if (stateChanged) {
+                passiveTriggered = false; typeModifierText = 0;
+                drawTextBox(vijand_team[activeEnemyIdx].naam, vijand_team[activeEnemyIdx].moves[0].naam);
+            }
             if (bTimer == 45) { eOffX = -15; redrawBattleScene(); } 
             if (bTimer == 35) { eOffX = 0; redrawBattleScene(); }
             if (bTimer == 25) { pVis = false; redrawBattleScene(); } 
@@ -350,23 +412,47 @@ bool updateBattle() {
             bTimer--;
             if (bTimer <= 0) {
                 pVis = true;
-                int damage = calculateDamage(&vijand_team[activeEnemyIdx], &vijand_team[activeEnemyIdx].moves[0]);
+                int damage = calculateDamage(&vijand_team[activeEnemyIdx], &team[activeIdx], &vijand_team[activeEnemyIdx].moves[0]);
                 team[activeIdx].hp -= damage;
                 if (team[activeIdx].hp < 0) team[activeIdx].hp = 0;
                 redrawBattleScene();
-                bState = 4; bTimer = 60;
+                
+                if (typeModifierText == 1) { bState = 30; bTimer = 40; } 
+                else if (typeModifierText == 2) { bState = 31; bTimer = 40; } 
+                else { bState = 4; bTimer = 60; }
             }
         }
     }
+    else if (bState == 30) { 
+        if (stateChanged) drawTextBox("IT'S SUPER", "EFFECTIVE!");
+        bTimer--; if (bTimer <= 0) { bState = 4; bTimer = 60; }
+    }
+    else if (bState == 31) { 
+        if (stateChanged) drawTextBox("IT'S NOT VERY", "EFFECTIVE...");
+        bTimer--; if (bTimer <= 0) { bState = 4; bTimer = 60; }
+    }
     else if (bState == 4) { 
-        if (team[activeIdx].hp <= 0) {
-            if (stateChanged) { drawTextBox("YOU FAINTED...", ""); pVis = false; redrawBattleScene(); }
-            bTimer--;
-            if (bTimer <= 0) {
+        // EINDE BEURT PASSIVES (Healing Naruto Kurama)
+        if (stateChanged) {
+            if (team[activeIdx].hp > 0 && team[activeIdx].char_id == 4 && team[activeIdx].hp < team[activeIdx].max_hp) {
+                team[activeIdx].hp += 10;
+                if (team[activeIdx].hp > team[activeIdx].max_hp) team[activeIdx].hp = team[activeIdx].max_hp;
+                drawTextBox(team[activeIdx].naam, "RECOVERED HP!");
+                redrawBattleScene();
+                bTimer = 40; // Geef het even tijd om te lezen
+            } else {
+                bTimer = 0; // Skip als geen healing nodig is
+            }
+        }
+
+        bTimer--;
+        if (bTimer <= 0) {
+            if (team[activeIdx].hp <= 0) {
+                drawTextBox("YOU FAINTED...", ""); pVis = false; redrawBattleScene();
                 if (checkAliveTeam()) { bState = 10; teamSelect = 0; } 
                 else { drawTextBox("ALL HEROES FAINTED!", "GAME OVER..."); healWholeTeam(); return true; }
-            }
-        } else { bState = 1; }
+            } else { bState = 1; }
+        }
     }
     else if (bState == 11) { 
         if (stateChanged) drawTextBox(team[activeIdx].naam, "GAINED XP & ITEMS!");
@@ -379,29 +465,27 @@ bool updateBattle() {
                 team[activeIdx].xp_nodig = 50 + (team[activeIdx].lvl * 15);
                 team[activeIdx].max_hp += 10;
                 team[activeIdx].hp = team[activeIdx].max_hp;
-                
-                extern void checkEvolutie(Karakter* k);
-                checkEvolutie(&team[activeIdx]);
-            }
+                bState = 16; bTimer = 80; 
+            } else { return true; }
+        }
+    }
+    else if (bState == 16) { 
+        if (stateChanged) { drawTextBox(team[activeIdx].naam, "LEVELED UP!"); redrawBattleScene(); }
+        bTimer--;
+        if (bTimer <= 0) {
+            checkNewMoves(&team[activeIdx]);
+            if (checkEvolutie(&team[activeIdx])) { justEvolved = true; }
             return true; 
         }
     }
-    else if (bState == 6) { 
-        if (stateChanged) drawTextBox("YOUR PARTY", "IS FULL!");
-        bTimer--;
-        if (bTimer <= 0) { bState = 1; }
-    }
     else if (bState == 10) { 
         if (stateChanged) {
-            drawUIBox(10, 10, 220, 100);
-            drawText("SELECT FIGHTER:", 15, 15, COLOR_GOLD);
+            drawUIBox(10, 10, 220, 100); drawText("SELECT FIGHTER:", 15, 15, COLOR_GOLD);
         }
         for(int i = 0; i < 6; i++) {
             if(team[i].isGevuld) {
-                uint16_t color = (teamSelect == i) ? COLOR_RED : COLOR_WHITE;
-                if(team[i].hp <= 0) color = 0x3DEF; 
-                drawText(team[i].naam, 30, 30 + (i * 12), color);
-                drawNumber(team[i].hp, 150, 30 + (i * 12), color);
+                uint16_t color = (teamSelect == i) ? COLOR_RED : COLOR_WHITE; if(team[i].hp <= 0) color = 0x3DEF; 
+                drawText(team[i].naam, 30, 30 + (i * 12), color); drawNumber(team[i].hp, 150, 30 + (i * 12), color);
             }
         }
         if (isKeyJustPressed(KEY_DOWN)) do { teamSelect = (teamSelect + 1) % 6; } while(!team[teamSelect].isGevuld);
@@ -411,19 +495,15 @@ bool updateBattle() {
                 activeIdx = teamSelect; pVis = true; redrawBattleScene(); bState = 12; bTimer = 40;
             }
         }
-        if (isKeyJustPressed(KEY_B)) {
-            if (team[activeIdx].hp > 0) { redrawBattleScene(); bState = 1; }
-        }
+        if (isKeyJustPressed(KEY_B)) { if (team[activeIdx].hp > 0) { redrawBattleScene(); bState = 1; } }
     }
     else if (bState == 12) { 
         if (stateChanged) drawTextBox("GO!", team[activeIdx].naam);
-        bTimer--;
-        if (bTimer <= 0) bState = 1;
+        bTimer--; if (bTimer <= 0) bState = 1;
     }
     else if (bState == 13) {
         if (stateChanged) drawTextBox("YOU CAN'T RUN", "FROM A BOSS!");
-        bTimer--;
-        if (bTimer <= 0) { bState = 1; }
+        bTimer--; if (bTimer <= 0) { bState = 1; }
     }
 
     return false;
