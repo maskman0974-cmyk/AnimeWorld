@@ -1,51 +1,59 @@
 #ifndef GAMEDATA_H
 #define GAMEDATA_H
 
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
 
-#define BITMAP_FRONT_SIZE 64*64 
-#define BITMAP_BACK_SIZE  32*32 
-
+// Structuur voor een aanval
 typedef struct {
-    char naam[20];
+    char naam[16];
     int kracht;
     int minLvl;
-    int effect;       
+    int effect;
     int effectChance; 
 } Move;
 
+// Structuur voor een karakter
 typedef struct {
     int char_id;
     char naam[20];
     int lvl;
-    int hp;
-    int max_hp;
     int xp;
     int xp_nodig;
+    int hp;
+    int max_hp;
     bool isGevuld;
-    int status;       
+    int status; 
+    Move moves[4];
     const uint16_t* battle_front_bitmap;
     const uint16_t* battle_back_bitmap;
-    Move moves[4];
 } Karakter;
 
-extern Karakter team[6];
-extern Karakter vijand;
-extern int activeIdx;
-extern int regio;
-extern int berries; 
-extern int itemAantal[5];
+// Externe variabelen voor Items
 extern char* itemNamen[5];
 extern int itemHeal[5];
+extern int itemAantal[5];
 
+// Externe variabelen voor Teams en PC
+extern Karakter team[6];
+extern Karakter vijand_team[6];
+extern Karakter pcBox[30];
+
+// Externe variabelen voor de game state
+extern int activeEnemyIdx;
+extern int activeIdx;
+extern int regio;
+
+// Functie declaraties
+void setMove(Move* m, const char* naam, int kracht, int minLvl, int effect, int chance);
+int getEmptyPartySlot(void);
+int getEmptyPcSlot(void);
+void healWholeTeam(void);
+bool checkAliveTeam(void);
+void checkNewMoves(Karakter* k);
+bool checkEvolutie(Karakter* k);
 void initKarakter(Karakter* k, int id, int lvl);
 void initTeam(void);
-bool checkNewMove(int char_id, int lvl, Move* newMove);
-void setMove(Move* m, const char* naam, int kracht, int minLvl, int effect, int chance);
-void healWholeTeam(void);
-int getEmptyPartySlot(void);
-bool checkAliveTeam(void);
-void checkEvolutie(Karakter* k); // <-- Hier is de functie die de compiler zocht!
+int getBaseType(int char_id);
 
 #endif
