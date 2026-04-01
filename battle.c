@@ -5,6 +5,13 @@
 
 #include "battle_bg.h"
 
+// --- V2.6 TRADING CARD HEADERS ---
+#include "Zoro_card.h"
+#include "LuffyG5_card.h"
+#include "Shanks_card.h"
+#include "Mvegeta_card.h"
+// ---------------------------------
+
 #define REG_KEYINPUT *(volatile uint16_t*)0x04000130
 #define KEY_A 0x0001
 #define KEY_B 0x0002
@@ -156,13 +163,26 @@ void drawVFX() {
     }
 }
 
+// --- V2.6 REDRAW BATTLE SCENE (MET TRADING CARDS) ---
 void redrawBattleScene() {
     waitVBlank(); 
     *(volatile uint32_t*)0x040000D4 = (uint32_t)battle_bgBitmap;
     *(volatile uint32_t*)0x040000D8 = (uint32_t)0x06000000;
     *(volatile uint32_t*)0x040000DC = 0x80000000 | 0x04000000 | 19200; 
 
-    if (pVis) drawBitmapSprite(24 + pOffX, 56, 64, 64, team[activeIdx].battle_back_bitmap);
+    // --- OPTIE 3: PERMANENTE KAART VOOR EVOLUTIES ---
+    if (pVis) {
+        if (team[activeIdx].char_id == 0 && team[activeIdx].status == 3) {
+            for(int y = 0; y < 80; y++) {
+                for(int x = 0; x < 64; x++) {
+                    drawPixel(24 + pOffX + x, 40 + y, LuffyG5_cardBitmap[y * 64 + x]);
+                }
+            }
+        } else {
+            drawBitmapSprite(24 + pOffX, 56, 64, 64, team[activeIdx].battle_back_bitmap);
+        }
+    }
+
     if (eVis) drawBitmapSprite(150 + eOffX, 16, 64, 64, vijand_team[activeEnemyIdx].battle_front_bitmap);
 
     drawVFX(); 
@@ -170,7 +190,37 @@ void redrawBattleScene() {
     if (bState != 10 && bState != 12 && bState != 14) {
         drawBattleUI();
     }
+
+    // --- OPTIE 2: SUMMON ANIMATIE ---
+    if (bState == 12 && bTimer > 15) { 
+        const uint16_t* summonCard = NULL;
+        if (team[activeIdx].char_id == 1) summonCard = Zoro_cardBitmap;
+        
+        if (summonCard != NULL && team[activeIdx].status < 3) {
+            for(int y = 0; y < 80; y++) {
+                for(int x = 0; x < 64; x++) {
+                    drawPixel(88 + x, 15 + y, summonCard[y * 64 + x]);
+                }
+            }
+        }
+    }
+
+    // --- OPTIE 1: ULTIMATE ATTACK CUT-IN ---
+    if (bState == 2 && bTimer > 15 && bTimer < 35) {
+        const uint16_t* attackCard = NULL;
+        if (team[activeIdx].char_id == 1) attackCard = Zoro_cardBitmap;
+        if (team[activeIdx].char_id == 0 && team[activeIdx].status == 3) attackCard = LuffyG5_cardBitmap;
+
+        if (attackCard != NULL) {
+            for(int y = 0; y < 80; y++) {
+                for(int x = 0; x < 64; x++) {
+                    drawPixel(88 + x, 15 + y, attackCard[y * 64 + x]);
+                }
+            }
+        }
+    }
 }
+// --------------------------------------------------
 
 int calculateDamage(Karakter* attacker, Karakter* defender, Move* m) {
     int dmg = (m->kracht * attacker->lvl) / 5 + (attacker->lvl * 2);
@@ -367,7 +417,6 @@ bool updateBattle() {
             if (vijand_team[activeEnemyIdx].hp < 0) vijand_team[activeEnemyIdx].hp = 0;
             redrawBattleScene(); 
             
-            // V2.6: Timers van 40 naar 80 verhoogd zodat je dit goed kan lezen!
             if (typeModifierText == 1) { bState = 20; bTimer = 80; } 
             else if (typeModifierText == 2) { bState = 21; bTimer = 80; } 
             else if (passiveTriggered) { bState = 22; bTimer = 80; } 
@@ -417,7 +466,6 @@ bool updateBattle() {
                 if (team[activeIdx].hp < 0) team[activeIdx].hp = 0;
                 redrawBattleScene();
                 
-                // V2.6: Verhoogd naar 80
                 if (typeModifierText == 1) { bState = 30; bTimer = 80; } 
                 else if (typeModifierText == 2) { bState = 31; bTimer = 80; } 
                 else { bState = 4; bTimer = 60; }
@@ -455,14 +503,13 @@ bool updateBattle() {
         }
     }
     else if (bState == 11) { 
-        // --- V2.6: ANIMATED XP BALK ---
         if (stateChanged) { 
             drawTextBox(team[activeIdx].naam, "GAINED XP & ITEMS!");
             target_xp = team[activeIdx].xp + (vijand_team[activeEnemyIdx].lvl * 20);
         }
         
         if (team[activeIdx].xp < target_xp) {
-            team[activeIdx].xp += 2; // Loopt nu vloeiend vol
+            team[activeIdx].xp += 2; 
             if (team[activeIdx].xp > target_xp) team[activeIdx].xp = target_xp;
             redrawBattleScene();
         } else {
@@ -475,3 +522,48 @@ bool updateBattle() {
                     team[activeIdx].max_hp += 10;
                     team[activeIdx].hp = team[activeIdx].max_hp;
                     bState = 16; bTimer = 80; 
+                } else { 
+                    return true; 
+                }
+            }
+        }
+    }
+    else if (bState == 16) { 
+        if (stateChanged) { drawTextBox(team[activeIdx].naam, "LEVELED UP!"); redrawBattleScene(); }
+        bTimer--;
+        if (bTimer <= 0) {
+            checkNewMoves(&team[activeIdx]);
+            if (checkEvolutie(&team[activeIdx])) { justEvolved = true; }
+            return true; 
+        }
+    }
+    else if (bState == 10) { 
+        if (stateChanged) {
+            drawUIBox(10, 10, 220, 100); drawText("SELECT FIGHTER:", 15, 15, COLOR_GOLD);
+        }
+        for(int i = 0; i < 6; i++) {
+            if(team[i].isGevuld) {
+                uint16_t color = (teamSelect == i) ? COLOR_RED : COLOR_WHITE; if(team[i].hp <= 0) color = 0x3DEF; 
+                drawText(team[i].naam, 30, 30 + (i * 12), color); drawNumber(team[i].hp, 150, 30 + (i * 12), color);
+            }
+        }
+        if (isKeyJustPressed(KEY_DOWN)) do { teamSelect = (teamSelect + 1) % 6; } while(!team[teamSelect].isGevuld);
+        if (isKeyJustPressed(KEY_UP)) do { teamSelect = (teamSelect - 1 + 6) % 6; } while(!team[teamSelect].isGevuld);
+        if (isKeyJustPressed(KEY_A)) {
+            if (team[teamSelect].hp > 0 && teamSelect != activeIdx) {
+                activeIdx = teamSelect; pVis = true; redrawBattleScene(); bState = 12; bTimer = 40;
+            }
+        }
+        if (isKeyJustPressed(KEY_B)) { if (team[activeIdx].hp > 0) { redrawBattleScene(); bState = 1; } }
+    }
+    else if (bState == 12) { 
+        if (stateChanged) drawTextBox("GO!", team[activeIdx].naam);
+        bTimer--; if (bTimer <= 0) bState = 1;
+    }
+    else if (bState == 13) {
+        if (stateChanged) drawTextBox("YOU CAN'T RUN", "FROM A BOSS!");
+        bTimer--; if (bTimer <= 0) { bState = 1; }
+    }
+
+    return false;
+}
