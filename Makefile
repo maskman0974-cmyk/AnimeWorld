@@ -1,46 +1,32 @@
-# --- PROJECT NAAM ---
-ROM = AnimeBattle.gba
-ELF = AnimeBattle.elf
+# --- ANIME WORLD MAKEFILE V2.6 ---
+# Deze Makefile pakt automatisch ALLE .c bestanden in je map.
 
-# --- COMPILER INSTELLINGEN ---
-CC = arm-none-eabi-gcc
-OBJCOPY = arm-none-eabi-objcopy
+# Vertel de Makefile waar de GBA tools staan (nooit meer handmatig exporteren!)
+export PATH := /opt/devkitpro/devkitARM/bin:$(PATH)
 
-CFLAGS = -mthumb -mthumb-interwork -O2 -Wall
-LDFLAGS = -specs=gba.specs
+TARGET  := AnimeBattle
+PREFIX  := arm-none-eabi-
+CC      := $(PREFIX)gcc
+OBJCOPY := $(PREFIX)objcopy
 
-# --- BRONBESTANDEN (Hier staan alle karakters en mappen!) ---
-# --- BRONBESTANDEN ---
-SOURCES = main.c graphics.c gamedata.c battle.c sound.c music.c \
-          bg.c battle_bg.c marineford.c alabasta.c konoha.c shibuya.c \
-          luffy.c luffy_front.c luffy_back.c \
-          zoro_front.c zoro_back.c \
-          kaido_front.c kaido_back.c \
-          goku_front.c goku_back.c \
-          madara_front.c madara_back.c \
-          naruto_front.c naruto_back.c \
-          obito_front.c obito_back.c \
-          pain_front.c pain_back.c \
-          shanks_front.c shanks_back.c \
-          vegeta_front.c vegeta_back.c \
-          itachi_front.c itachi_back.c
+ARCH    := -mthumb -mthumb-interwork
+CFLAGS  := $(ARCH) -O2 -Wall -std=gnu99
+LDFLAGS := $(ARCH) -specs=gba.specs
 
-# --- OBJECT BESTANDEN BEREKENEN ---
-OBJECTS = $(SOURCES:.c=.o)
+# Zoek automatisch alle .c bestanden (inclusief je Trading Cards!)
+CFILES  := $(wildcard *.c)
+OBJS    := $(CFILES:.c=.o)
 
-# --- BOUW REGELS ---
-all: $(ROM)
+all: $(TARGET).gba
 
-$(ROM): $(ELF)
-	$(OBJCOPY) -O binary $< $@
+$(TARGET).gba: $(TARGET).elf
+	$(OBJCOPY) -v -O binary $< $@
 
-$(ELF): $(OBJECTS)
-	$(CC) $(OBJECTS) $(LDFLAGS) -o $@
+$(TARGET).elf: $(OBJS)
+	$(CC) $(OBJS) $(LDFLAGS) -o $@
 
-# Hoe hij een .c bestand omzet in een .o bestand
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-# Commando om de map op te ruimen
 clean:
 	rm -f *.o *.elf *.gba
