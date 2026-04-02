@@ -170,12 +170,12 @@ void redrawBattleScene() {
     *(volatile uint32_t*)0x040000D8 = (uint32_t)0x06000000;
     *(volatile uint32_t*)0x040000DC = 0x80000000 | 0x04000000 | 19200; 
 
-    // --- OPTIE 3: PERMANENTE KAART VOOR EVOLUTIES ---
     if (pVis) {
         if (team[activeIdx].char_id == 0 && team[activeIdx].status == 3) {
+            const uint16_t* g5_kaart = (const uint16_t*)LuffyG5_cardBitmap;
             for(int y = 0; y < 80; y++) {
                 for(int x = 0; x < 64; x++) {
-                    drawPixel(24 + pOffX + x, 40 + y, LuffyG5_cardBitmap[y * 64 + x]);
+                    drawPixel(24 + pOffX + x, 40 + y, g5_kaart[y * 64 + x]);
                 }
             }
         } else {
@@ -191,10 +191,9 @@ void redrawBattleScene() {
         drawBattleUI();
     }
 
-    // --- OPTIE 2: SUMMON ANIMATIE ---
     if (bState == 12 && bTimer > 15) { 
         const uint16_t* summonCard = NULL;
-        if (team[activeIdx].char_id == 1) summonCard = Zoro_cardBitmap;
+        if (team[activeIdx].char_id == 1) summonCard = (const uint16_t*)Zoro_cardBitmap;
         
         if (summonCard != NULL && team[activeIdx].status < 3) {
             for(int y = 0; y < 80; y++) {
@@ -205,11 +204,10 @@ void redrawBattleScene() {
         }
     }
 
-    // --- OPTIE 1: ULTIMATE ATTACK CUT-IN ---
     if (bState == 2 && bTimer > 15 && bTimer < 35) {
         const uint16_t* attackCard = NULL;
-        if (team[activeIdx].char_id == 1) attackCard = Zoro_cardBitmap;
-        if (team[activeIdx].char_id == 0 && team[activeIdx].status == 3) attackCard = LuffyG5_cardBitmap;
+        if (team[activeIdx].char_id == 1) attackCard = (const uint16_t*)Zoro_cardBitmap;
+        if (team[activeIdx].char_id == 0 && team[activeIdx].status == 3) attackCard = (const uint16_t*)LuffyG5_cardBitmap;
 
         if (attackCard != NULL) {
             for(int y = 0; y < 80; y++) {
