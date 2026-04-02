@@ -11,12 +11,10 @@
 #include "shibuya.h"
 #include "luffy.h" 
 
-// --- V2.6 TRADING CARD HEADERS ---
 #include "LuffyG5_card.h"
 #include "Zoro_card.h"
 #include "Shanks_card.h"
 #include "Mvegeta_card.h"
-// ---------------------------------
 
 #define REG_DISPCNT  *(volatile uint16_t*)0x04000000
 #define REG_VCOUNT   *(volatile uint16_t*)0x04000006
@@ -24,8 +22,6 @@
 #define REG_BG0HOFS  *(volatile uint16_t*)0x04000010 
 #define REG_BG0VOFS  *(volatile uint16_t*)0x04000012 
 #define REG_KEYINPUT *(volatile uint16_t*)0x04000130
-
-
 
 #define COLOR_BLACK 0x0000
 #define COLOR_GOLD  0x03FF
@@ -46,7 +42,6 @@ extern void drawBitmapSprite(int x, int y, int width, int height, const uint16_t
 extern int getEmptyPartySlot(void);
 extern int getEmptyPcSlot(void);
 
-// --- V2.6 TRADING CARD RENDER FUNCTIE ---
 void drawTradingCard(const void* bitmapData) {
     const uint16_t* bitmap = (const uint16_t*)bitmapData; 
     volatile uint16_t* vram = (volatile uint16_t*)0x06000000;
@@ -57,7 +52,6 @@ void drawTradingCard(const void* bitmapData) {
         }
     }
 }
-// ----------------------------------------
 
 void drawRectMain(int x, int y, int w, int h, uint16_t color) {
     volatile uint16_t* vram = (volatile uint16_t*)0x06000000;
@@ -89,7 +83,6 @@ static uint16_t current_keys = 0;
 static uint16_t previous_keys = 0;
 extern bool justEvolved;
 
-// V2.5 NIEUWE GLOBALS VOOR PUZZELS & ENDGAME
 bool gameCleared = false;
 bool hasDragonBall = false;
 bool hasMasterNet = false;
@@ -163,7 +156,7 @@ int main() {
                 drawRectMain(0, 0, 240, 160, 0x1084); 
                 drawUIBoxMain(40, 30, 160, 80);
                 drawText("ANIME WORLD", 80, 50, COLOR_GOLD); 
-                drawText("V2.6 TRADING CARDS", 60, 70, COLOR_WHITE); 
+                drawText("V2.7 QUESTS & XP", 60, 70, COLOR_WHITE); 
                 drawText("PRESS START", 80, 130, COLOR_WHITE); 
                 stateChanged = false;
             }
@@ -223,12 +216,10 @@ int main() {
             // SIDE QUEST NPC
             int questX = 80;
             int questY = 140;
-            if (side_quest_stage[regio] == 0) {
-                int qx = questX - camX; 
-                int qy = questY - camY;
-                if (qx > -16 && qx < 240 && qy > -16 && qy < 160) {
-                    setSpriteAttribute(3, qx, qy, 0, 0, 0, 1);
-                } else { setSpriteAttribute(3, 0, 160, 0, 0, 0, 1); }
+            int qx = questX - camX; 
+            int qy = questY - camY;
+            if (qx > -16 && qx < 240 && qy > -16 && qy < 160) {
+                setSpriteAttribute(3, qx, qy, 0, 0, 0, 1);
             } else { setSpriteAttribute(3, 0, 160, 0, 0, 0, 1); }
 
             // NURSE JOY
@@ -245,7 +236,7 @@ int main() {
                     hasDragonBall = true; state = 101; stateChanged = true;
                 }
                 else if (abs(worldX-40) < 30 && abs(worldY-40) < 30) { state = 9; shopCursor = 0; stateChanged = true; }
-                else if (side_quest_stage[regio] == 0 && abs(worldX - questX) < 30 && abs(worldY - questY) < 30) {
+                else if (abs(worldX - questX) < 30 && abs(worldY - questY) < 30) {
                     dialoguePage = 0; state = 80; stateChanged = true;
                 }
                 else if (regio_stage[regio] <= 5 && abs(worldX - npcX) < 30 && abs(worldY - npcY) < 30) {
@@ -298,7 +289,6 @@ int main() {
                 drawUIBoxMain(10, 10, 220, 100);
                 drawText("--- ANIME CUTSCENE ---", 40, 40, COLOR_GOLD);
                 drawText("(INSERT YOUR PNG HERE LATER)", 20, 60, COLOR_WHITE);
-                
                 drawTextBox("MADARA:", "PREPARE TO BE CRUSHED!");
                 stateChanged = false;
             }
@@ -341,8 +331,7 @@ int main() {
         }
         else if (state == 110) { 
             if (stateChanged) {
-                drawRectMain(0, 0, 240, 160, 0x2108);
-                drawUIBoxMain(40, 40, 160, 80);
+                drawRectMain(0, 0, 240, 160, 0x2108); drawUIBoxMain(40, 40, 160, 80);
                 drawText("ENDLESS COLOSSEUM", 50, 50, COLOR_GOLD);
                 drawText("WAVE:", 60, 70, COLOR_WHITE); drawNumber(colosseumWave, 110, 70, COLOR_WHITE);
                 drawText("FIGHT", 60, 90, (menuCursor==0?COLOR_RED:COLOR_WHITE));
@@ -353,28 +342,22 @@ int main() {
             if (isKeyJustPressed(KEY_UP)) { menuCursor = (menuCursor+1)%2; stateChanged = true; }
             if (isKeyJustPressed(KEY_A)) {
                 if (menuCursor == 0) {
-                    prevRegio = regio;
-                    regio = 5; 
+                    prevRegio = regio; regio = 5; 
                     regio_stage[5] = (colosseumWave > 5) ? 5 : colosseumWave; 
                     interactie_npc = rand() % 11; 
                     state = 2; startBattle(true); stateChanged = true;
-                } else {
-                    state = 9; stateChanged = true; 
-                }
+                } else { state = 9; stateChanged = true; }
             }
             if (isKeyJustPressed(KEY_B)) { state = 9; stateChanged = true; }
         }
         else if (state == 112) { 
             if (stateChanged) {
-                drawRectMain(0, 0, 240, 160, COLOR_BLACK);
-                drawUIBoxMain(20, 40, 200, 80);
+                drawRectMain(0, 0, 240, 160, COLOR_BLACK); drawUIBoxMain(20, 40, 200, 80);
                 drawText("COLOSSEUM DEFEAT...", 50, 60, COLOR_RED);
                 drawText("WAVES CLEARED:", 40, 80, COLOR_WHITE); drawNumber(colosseumWave - 1, 150, 80, COLOR_GOLD);
                 stateChanged = false;
             }
-            if (isKeyJustPressed(KEY_A)) {
-                colosseumWave = 1; healWholeTeam(); regio = prevRegio; state = 1; stateChanged = true;
-            }
+            if (isKeyJustPressed(KEY_A)) { colosseumWave = 1; healWholeTeam(); regio = prevRegio; state = 1; stateChanged = true; }
         }
         else if (state == 75) { 
             if (stateChanged) {
@@ -445,22 +428,43 @@ int main() {
             }
             if (isKeyJustPressed(KEY_B)) { state = 75; stateChanged = true; }
         }
+        // --- V2.7: START MENU MET TYPE GUIDE ---
         else if (state == 7) { 
             if (stateChanged) { 
-                REG_DISPCNT = 0x0403; drawRectMain(0, 0, 240, 160, 0x2108); drawUIBoxMain(60, 20, 120, 120); 
+                REG_DISPCNT = 0x0403; drawRectMain(0, 0, 240, 160, 0x2108); drawUIBoxMain(60, 10, 120, 140); 
                 drawText("STAGE:", 10, 10, COLOR_WHITE); drawNumber(regio_stage[regio], 60, 10, COLOR_WHITE); drawText("/ 5", 70, 10, COLOR_WHITE);
-                drawText("PARTY", 95, 40, (menuCursor==0?COLOR_RED:COLOR_WHITE)); drawText("BAG", 95, 60, (menuCursor==1?COLOR_RED:COLOR_WHITE));
-                drawText("ANIME DEX", 95, 80, (menuCursor==2?COLOR_RED:COLOR_WHITE)); drawText("CLOSE", 95, 100, (menuCursor==3?COLOR_RED:COLOR_WHITE));
+                drawText("PARTY", 95, 30, (menuCursor==0?COLOR_RED:COLOR_WHITE)); 
+                drawText("BAG", 95, 50, (menuCursor==1?COLOR_RED:COLOR_WHITE));
+                drawText("ANIME DEX", 95, 70, (menuCursor==2?COLOR_RED:COLOR_WHITE)); 
+                drawText("TYPE GUIDE", 95, 90, (menuCursor==3?COLOR_RED:COLOR_WHITE));
+                drawText("CLOSE", 95, 110, (menuCursor==4?COLOR_RED:COLOR_WHITE));
                 stateChanged = false; 
             }
-            if (isKeyJustPressed(KEY_DOWN)) { menuCursor = (menuCursor+1)%4; stateChanged = true; }
-            if (isKeyJustPressed(KEY_UP)) { menuCursor = (menuCursor+3)%4; stateChanged = true; }
+            if (isKeyJustPressed(KEY_DOWN)) { menuCursor = (menuCursor+1)%5; stateChanged = true; }
+            if (isKeyJustPressed(KEY_UP)) { menuCursor = (menuCursor+4)%5; stateChanged = true; }
             if (isKeyJustPressed(KEY_A)) { 
-                if (menuCursor == 0) { state = 71; } else if (menuCursor == 1) { state = 73; bagCursor = 0; } 
-                else if (menuCursor == 2) { state = 72; } else { state = 1; }
+                if (menuCursor == 0) { state = 71; } 
+                else if (menuCursor == 1) { state = 73; bagCursor = 0; } 
+                else if (menuCursor == 2) { state = 72; } 
+                else if (menuCursor == 3) { state = 78; } // Naar Guide
+                else { state = 1; }
                 stateChanged = true; 
             }
             if (isKeyJustPressed(KEY_B)) { state = 1; stateChanged = true; }
+        }
+        else if (state == 78) { // TYPE GUIDE SCHERM
+            if (stateChanged) {
+                drawRectMain(0, 0, 240, 160, 0x2108); drawUIBoxMain(10, 10, 220, 140);
+                drawText("--- TYPE EFFECTIVENESS ---", 30, 20, COLOR_GOLD);
+                drawText("1. KI BEATS DEVIL FRUIT", 20, 45, COLOR_WHITE);
+                drawText("2. DEVIL FRUIT BEATS CHAKRA", 20, 60, COLOR_WHITE);
+                drawText("3. CHAKRA BEATS HAKI", 20, 75, COLOR_WHITE);
+                drawText("4. HAKI BEATS KI", 20, 90, COLOR_WHITE);
+                drawText("5. FYSIEK IS NEUTRAL", 20, 105, COLOR_WHITE);
+                drawText("PRESS B TO RETURN", 50, 130, COLOR_RED);
+                stateChanged = false;
+            }
+            if (isKeyJustPressed(KEY_B) || isKeyJustPressed(KEY_A)) { state = 7; stateChanged = true; }
         }
         else if (state == 73) { 
             if (stateChanged) {
@@ -520,33 +524,66 @@ int main() {
             if (isKeyJustPressed(KEY_LEFT)) { dexCursor = (dexCursor+10)%11; stateChanged = true; }
             if (isKeyJustPressed(KEY_B)) { state = 7; stateChanged = true; }
         }
+
+        // --- V2.7: MULTI-STEP NPC MISSIONS ---
         else if (state == 80) { 
             if (stateChanged) {
                 REG_DISPCNT = 0x0403; drawRectMain(0, 0, 240, 160, 0x2108);
-                if (regio == 0) {
-                    if (dialoguePage == 0) drawTextBox("VILLAGER: HELP! A", "ROGUE SAMURAI...");
-                    else if (dialoguePage == 1) drawTextBox("VILLAGER: HE IS", "ATTACKING PEOPLE!");
-                    else drawTextBox("VILLAGER: PLEASE,", "STOP HIM!");
-                } else { drawTextBox("VILLAGER: NO QUEST", "AVAILABLE HERE."); }
+                if (regio == 0) { 
+                    if (side_quest_stage[0] == 0) {
+                        if (dialoguePage == 0) drawTextBox("VILLAGER: I'M STARVING...", "I DROPPED MY MEAT BONE.");
+                        else if (dialoguePage == 1) drawTextBox("VILLAGER: IF YOU FIND ONE", "CAN I PLEASE HAVE IT?");
+                        else drawTextBox("PRESS A TO GIVE MEAT", "PRESS B TO DECLINE");
+                    } else {
+                        drawTextBox("VILLAGER: THANKS FOR", "THE MEAT EARLIER!");
+                    }
+                } else { drawTextBox("VILLAGER: NO QUEST", "AVAILABLE YET."); }
                 stateChanged = false;
             }
             if (isKeyJustPressed(KEY_A)) {
-                int maxPages = (regio == 0) ? 2 : 0;
-                if (dialoguePage < maxPages) { dialoguePage++; stateChanged = true; }
-                else if (regio == 0) { interactie_npc = 1; state = 2; startBattle(false); stateChanged = true; } 
-                else { state = 1; stateChanged = true; }
+                if (regio == 0 && side_quest_stage[0] == 0) {
+                    if (dialoguePage < 2) { dialoguePage++; stateChanged = true; }
+                    else {
+                        if (itemAantal[0] > 0) { // Item 0 = MEAT BONE
+                            itemAantal[0]--;
+                            berries += 2500;
+                            itemAantal[2]++; // Senzu Bean beloning
+                            side_quest_stage[0] = 1;
+                            state = 81; stateChanged = true; // Succes scherm
+                        } else {
+                            state = 82; stateChanged = true; // Faal scherm
+                        }
+                    }
+                } else { state = 1; stateChanged = true; }
             }
+            if (isKeyJustPressed(KEY_B)) { state = 1; stateChanged = true; }
         }
+        else if (state == 81) {
+            if (stateChanged) {
+                drawRectMain(0, 0, 240, 160, 0x2108);
+                drawTextBox("QUEST COMPLETE!", "GOT 2500B & SENZU BEAN");
+                stateChanged = false;
+            }
+            if (isKeyJustPressed(KEY_A) || isKeyJustPressed(KEY_B)) { state = 1; stateChanged = true; }
+        }
+        else if (state == 82) {
+            if (stateChanged) {
+                drawRectMain(0, 0, 240, 160, 0x2108);
+                drawTextBox("YOU DON'T HAVE ANY", "MEAT BONES!");
+                stateChanged = false;
+            }
+            if (isKeyJustPressed(KEY_A) || isKeyJustPressed(KEY_B)) { state = 1; stateChanged = true; }
+        }
+        // -------------------------------------
+
         else if (state == 8) { 
             if (stateChanged) { 
                 REG_DISPCNT = 0x0403; drawRectMain(0, 0, 240, 160, 0x2108);
                 int stage = regio_stage[regio];
                 
-                // --- V2.6: TRADING CARDS INJECTIE ---
                 if (regio == 0 && stage == 1) drawTradingCard(Zoro_cardBitmap);
                 if (regio == 1 && stage == 4) drawTradingCard(Shanks_cardBitmap);
                 if (regio == 2 && stage == 3) drawTradingCard(Mvegeta_cardBitmap);
-                // ------------------------------------
 
                 if (regio == 0) {
                     if (stage == 1) {
@@ -564,7 +601,7 @@ int main() {
                 } 
                 else if (regio == 1) { 
                     if (stage == 1) drawTextBox("ZORO: THE MARINES ARE", "SWARMING THIS PLACE."); else if (stage == 2) drawTextBox("NARUTO: I WON'T LET", "MY FRIENDS DIE HERE!");
-                    else if (stage == 3) drawTextBox("PAIN: WAR ONLY", "BREEDS MORE PAIN."); else if (stage == 4) drawTextBox("SHANKS: I'm COME TO", "PUT AN END TO THIS WAR.");
+                    else if (stage == 3) drawTextBox("PAIN: WAR ONLY", "BREEDS MORE PAIN."); else if (stage == 4) drawTextBox("SHANKS: I'M COME TO", "PUT AN END TO THIS WAR.");
                     else drawTextBox("MADARA: THIS BATTLEFIELD", "LACKS TRUE DESPAIR.");
                 } 
                 else if (regio == 2) { 
@@ -683,21 +720,14 @@ int main() {
             animTimer--;
             if (animTimer == 100) {
                 drawRectMain(0, 0, 240, 160, COLOR_BLACK); 
-                
-                // --- V2.6: LUFFY G5 CARD OP EVOLUTIE! ---
-                if (team[activeIdx].char_id == 0 && team[activeIdx].status == 3) {
-                    drawTradingCard(LuffyG5_cardBitmap);
-                }
-                // Text box lager zetten zodat hij de kaart niet overlapt
+                if (team[activeIdx].char_id == 0 && team[activeIdx].status == 3) { drawTradingCard(LuffyG5_cardBitmap); }
                 drawUIBoxMain(10, 110, 220, 45);
                 drawText("WHAT? YOUR HERO", 20, 120, COLOR_WHITE); 
                 drawText("IS EVOLVING!", 20, 135, COLOR_GOLD);
             }
             if (animTimer == 40) {
                 drawRectMain(0, 0, 240, 160, COLOR_BLACK); 
-                if (team[activeIdx].char_id == 0 && team[activeIdx].status == 3) {
-                    drawTradingCard(LuffyG5_cardBitmap);
-                }
+                if (team[activeIdx].char_id == 0 && team[activeIdx].status == 3) { drawTradingCard(LuffyG5_cardBitmap); }
                 drawUIBoxMain(10, 110, 220, 45);
                 drawText("CONGRATULATIONS!", 20, 120, COLOR_GREEN); 
                 drawText(team[activeIdx].naam, 20, 135, COLOR_WHITE);
@@ -732,10 +762,6 @@ int main() {
                 if (vijand_team[0].hp <= 0 && bBoss) { 
                     berries += (500 * regio_stage[regio]); itemAantal[0] += 1; regio_stage[regio]++; 
                     if (regio == 4 && regio_stage[regio] > 5) { state = 99; stateChanged = true; initOAM(); continue; }
-                }
-                
-                if (vijand_team[0].hp <= 0 && interactie_npc == 1 && side_quest_stage[regio] == 0 && state == 80) {
-                    side_quest_stage[regio] = 1; berries += 1000; 
                 }
                 
                 if (bBoss) { worldX -= 15; interactie_npc = 0; }
