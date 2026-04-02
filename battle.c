@@ -23,12 +23,11 @@
 #define BAR_RED      0x001F
 #define BAR_BLUE     0x7C00
 
-// V2.8 PRO FIX: Kleur Palette voor Type Guide
-#define TYPE_COL_FYS 0x3DEF // Grijs/Fysiek
-#define TYPE_COL_KI  0x001F // Rood/Ki
-#define TYPE_COL_CHA 0x7C00 // Blauw/Chakra
-#define TYPE_COL_HAK 0x401F // Paars/Haki
-#define TYPE_COL_DEV 0x03FF // Goud/DevilFruit
+#define TYPE_COL_FYS 0x3DEF 
+#define TYPE_COL_KI  0x001F 
+#define TYPE_COL_CHA 0x7C00 
+#define TYPE_COL_HAK 0x401F 
+#define TYPE_COL_DEV 0x03FF 
 
 extern void waitVBlank(); 
 extern void initGraphicsMode3(void);
@@ -66,7 +65,6 @@ int teamSelect = 0;
 int bBagCursor = 0; 
 bool justEvolved = false;
 
-// V2.8 PRO FIX: Global structs voor pre-calculation van levels
 typedef struct {
     int levels_to_gain;
     int max_hp_gain;
@@ -83,11 +81,11 @@ typedef struct {
     int final_xp_nodig;
 } PendingStats;
 
-PendingStats teamPending[6]; // Slaat uitkomsten op voor iedereen
-bool participated[6] = {false}; // Bijhouden wie XP mag krijgen
-int xp_pool_accumulated = 0; // Telt XP op tijdens het gevecht
-int xp_to_give = 0; // Bevat shared_xp voor de actieve held's animatie
-int target_xp = 0; // Voor de animatie
+PendingStats teamPending[6]; 
+bool participated[6] = {false}; 
+int xp_pool_accumulated = 0; 
+int xp_to_give = 0; 
+int target_xp = 0; 
 
 int pOffX = 0; 
 int eOffX = 0;
@@ -97,7 +95,6 @@ bool eVis = true;
 int typeModifierText = 0; 
 bool passiveTriggered = false;
 
-// --- GFX: Kleuren Guide ---
 char* typeAfk[5] = {"[FYS]", "[ KI]", "[CHA]", "[HAK]", "[DEV]"};
 
 uint16_t getTypeColor(int typeID) {
@@ -109,13 +106,12 @@ uint16_t getTypeColor(int typeID) {
 }
 
 int getBaseType(int char_id) {
-    if (char_id == 3 || char_id == 5) return 1; // Ki (Goku, Vegeta)
-    if (char_id == 4 || char_id == 7 || char_id == 8 || char_id == 9 || char_id == 10) return 2; // Chakra
-    if (char_id == 1 || char_id == 6) return 3; // Haki (Zoro, Shanks)
-    if (char_id == 0 || char_id == 2) return 4; // DF (Luffy, Kaido)
-    return 0; // Fysiek (Standaard)
+    if (char_id == 3 || char_id == 5) return 1; 
+    if (char_id == 4 || char_id == 7 || char_id == 8 || char_id == 9 || char_id == 10) return 2; 
+    if (char_id == 1 || char_id == 6) return 3; 
+    if (char_id == 0 || char_id == 2) return 4; 
+    return 0; 
 }
-// ----------------------------
 
 void drawRect(int x, int y, int w, int h, uint16_t color) {
     for(int r = 0; r < h; r++) for(int c = 0; c < w; c++) drawPixel(x + c, y + r, color);
@@ -153,7 +149,6 @@ void drawBar(int x, int y, int w, int h, int val, int max, uint16_t color) {
 void drawBattleUI() {
     drawUIBox(6, 8, 118, 34); 
     drawText(vijand_team[activeEnemyIdx].naam, 10, 12, COLOR_WHITE);
-    // V2.8 FIX: Typeguide is nu kleurrijk direct naast de naam!
     int eType = getBaseType(vijand_team[activeEnemyIdx].char_id);
     drawText(typeAfk[eType], 70, 12, getTypeColor(eType));
     drawText("LVL", 90, 12, COLOR_GOLD); 
@@ -166,7 +161,6 @@ void drawBattleUI() {
     
     drawUIBox(116, 68, 120, 42); 
     drawText(team[activeIdx].naam, 120, 72, COLOR_WHITE);
-    // V2.8 FIX: Typeguide is nu kleurrijk direct naast de naam!
     int pType = getBaseType(team[activeIdx].char_id);
     drawText(typeAfk[pType], 165, 72, getTypeColor(pType));
     drawText("LVL", 195, 72, COLOR_GOLD); 
@@ -196,13 +190,51 @@ void drawVFX() {
     }
 }
 
+// V2.9 FIX: Functie om gericht achtergrond terug te tekenen zonder heel het scherm te wissen
+void restoreBG(int x, int y, int w, int h) {
+    for(int r = 0; r < h; r++) {
+        for(int c = 0; c < w; c++) {
+            if (x + c >= 0 && x + c < 240 && y + r >= 0 && y + r < 160) {
+                drawPixel(x + c, y + r, battle_bgBitmap[(y + r) * 240 + (x + c)]);
+            }
+        }
+    }
+}
+
+// V2.9 FIX: Specifieke update loop voor de karakters en aanvallen
+void updateAttackAnim() {
+    waitVBlank();
+    // Wis alleen de sprites uit met de achtergrond pixels! (De UI blijft intact)
+    restoreBG(24, 40, 80, 80);
+    restoreBG(135, 16, 80, 80);
+
+    // Teken Speler
+    if (pVis) {
+        if (team[activeIdx].char_id == 0 && team[activeIdx].status == 3) {
+            const uint16_t* g5_kaart = (const uint16_t*)LuffyG5_cardBitmap;
+            for(int y = 0; y < 80; y++) {
+                for(int x = 0; x < 64; x++) {
+                    drawPixel(24 + pOffX + x, 40 + y, g5_kaart[y * 64 + x]);
+                }
+            }
+        } else {
+            drawBitmapSprite(24 + pOffX, 56, 64, 64, team[activeIdx].battle_back_bitmap);
+        }
+    }
+
+    // Teken Vijand
+    if (eVis) drawBitmapSprite(150 + eOffX, 16, 64, 64, vijand_team[activeEnemyIdx].battle_front_bitmap);
+
+    drawVFX();
+}
+
+// Dit is voor volledige scherm transities
 void redrawBattleScene() {
     waitVBlank(); 
     *(volatile uint32_t*)0x040000D4 = (uint32_t)battle_bgBitmap;
     *(volatile uint32_t*)0x040000D8 = (uint32_t)0x06000000;
     *(volatile uint32_t*)0x040000DC = 0x80000000 | 0x04000000 | 19200; 
 
-    // V2.8 GFX: Tijdens gevecht tekenen we *alle sprites* onmiddellijk, nul flicker!
     if (pVis) {
         if (team[activeIdx].char_id == 0 && team[activeIdx].status == 3) {
             const uint16_t* g5_kaart = (const uint16_t*)LuffyG5_cardBitmap;
@@ -218,37 +250,8 @@ void redrawBattleScene() {
 
     if (eVis) drawBitmapSprite(150 + eOffX, 16, 64, 64, vijand_team[activeEnemyIdx].battle_front_bitmap);
 
-    drawVFX(); 
-
     if (bState != 10 && bState != 12 && bState != 14) {
         drawBattleUI();
-    }
-
-    if (bState == 12 && bTimer > 15) { 
-        const uint16_t* summonCard = NULL;
-        if (team[activeIdx].char_id == 1) summonCard = (const uint16_t*)Zoro_cardBitmap;
-        
-        if (summonCard != NULL && team[activeIdx].status < 3) {
-            for(int y = 0; y < 80; y++) {
-                for(int x = 0; x < 64; x++) {
-                    drawPixel(88 + x, 15 + y, summonCard[y * 64 + x]);
-                }
-            }
-        }
-    }
-
-    if (bState == 2 && bTimer > 15 && bTimer < 35) {
-        const uint16_t* attackCard = NULL;
-        if (team[activeIdx].char_id == 1) attackCard = (const uint16_t*)Zoro_cardBitmap;
-        if (team[activeIdx].char_id == 0 && team[activeIdx].status == 3) attackCard = (const uint16_t*)LuffyG5_cardBitmap;
-
-        if (attackCard != NULL) {
-            for(int y = 0; y < 80; y++) {
-                for(int x = 0; x < 64; x++) {
-                    drawPixel(88 + x, 15 + y, attackCard[y * 64 + x]);
-                }
-            }
-        }
     }
 }
 
@@ -289,7 +292,6 @@ void startBattle(bool isStory) {
     pOffX = 0; eOffX = 0; pVis = true; eVis = true;
     justEvolved = false;
 
-    // V2.8: Reset deelname voor verdeling XP
     for(int i=0; i<6; i++) { participated[i] = false; teamPending[i].levels_to_gain = 0; }
     participated[activeIdx] = true;
     xp_pool_accumulated = 0;
@@ -325,15 +327,12 @@ void startBattle(bool isStory) {
     redrawBattleScene();
 }
 
-// V2.8 GFX: Rollback data voor flicker-free HP bars
 static int dynamic_old_vijand_hp = 0;
 static int dynamic_target_vijand_hp = 0;
 static int dynamic_old_active_hp = 0;
 static int dynamic_target_active_hp = 0;
 static int dynamic_anim_timer = 0;
-
-// V2.8 globals voor pre-calculated victory
-static int levelupQueueCharIdx = 0; // Tracks wie we displayen
+static int levelupQueueCharIdx = 0; 
 
 bool updateBattle() {
     bool stateChanged = (bState != prevState);
@@ -413,7 +412,7 @@ bool updateBattle() {
         bTimer--; if (bTimer <= 0) { bState = 3; bTimer = 60; } 
     }
     else if (bState == 7) { 
-        if (stateChanged) { drawTextBox("YOU THREW A", "CAPTURE NET!"); }
+        if (stateChanged) { redrawBattleScene(); drawTextBox("YOU THREW A", "CAPTURE NET!"); }
         if (bTimer == 50) { eVis = false; redrawBattleScene(); }
         if (bTimer == 40) { eVis = true; redrawBattleScene(); }
         if (bTimer == 30) { eVis = false; redrawBattleScene(); }
@@ -445,35 +444,41 @@ bool updateBattle() {
             passiveTriggered = false; typeModifierText = 0;
             drawTextBox(team[activeIdx].naam, team[activeIdx].moves[bMoveSelect].naam);
         }
-        if (bTimer == 35) { pOffX = 15; redrawBattleScene(); } 
-        if (bTimer == 25) { pOffX = 0; redrawBattleScene(); } 
-        if (bTimer == 15) { eVis = false; redrawBattleScene(); } 
-        if (bTimer == 10) { eVis = true; redrawBattleScene(); }
-        if (bTimer == 5)  { eVis = false; redrawBattleScene(); }
+        
+        // V2.9 FIX: updateAttackAnim tekent alleen de karakters, geen geflikker meer
+        if (bTimer == 35) { pOffX = 15; updateAttackAnim(); } 
+        if (bTimer == 25) { pOffX = 0; updateAttackAnim(); } 
+        if (bTimer == 15) { eVis = false; updateAttackAnim(); } 
+        if (bTimer == 10) { eVis = true; updateAttackAnim(); }
+        if (bTimer == 5)  { eVis = false; updateAttackAnim(); }
         
         bTimer--;
         if (bTimer <= 0) {
             eVis = true; 
+            updateAttackAnim(); // Zorgt dat de vijand niet verdwijnt na de flits!
+            
             int damage = calculateDamage(&team[activeIdx], &vijand_team[activeEnemyIdx], &team[activeIdx].moves[bMoveSelect]);
             
-            // V2.8 GFX: Setup specialized dynamic HP animation
             dynamic_old_vijand_hp = vijand_team[activeEnemyIdx].hp;
-            vijand_team[activeEnemyIdx].hp -= damage; // Apply permanently
+            vijand_team[activeEnemyIdx].hp -= damage; 
             if (vijand_team[activeEnemyIdx].hp < 0) vijand_team[activeEnemyIdx].hp = 0;
             dynamic_target_vijand_hp = vijand_team[activeEnemyIdx].hp;
             
-            bState = 25; // Transition VState 25 (HP Drop Vijand)
+            bState = 25; 
         }
     }
-    // V2.8 GFX: Vijand HP animatie (Flicker Free)
     else if (bState == 25) { 
+        // V2.9 FIX: Skip de drain met A
+        if (isKeyJustPressed(KEY_A)) {
+            dynamic_old_vijand_hp = dynamic_target_vijand_hp; 
+        }
+        
         if (dynamic_old_vijand_hp > dynamic_target_vijand_hp) {
             dynamic_anim_timer++;
-            if (dynamic_anim_timer > 1) { // dropping HP 
+            if (dynamic_anim_timer > 1) { 
                 dynamic_old_vijand_hp--; 
                 dynamic_anim_timer = 0;
                 
-                // FIX FLICKER: NIET redrawBattleScene(), teken ENKEL het balkje en HP numbers!
                 int x = 12, y = 25, w = 100, h = 5;
                 int max_hp = vijand_team[activeEnemyIdx].max_hp;
                 int hp = dynamic_old_vijand_hp;
@@ -484,7 +489,6 @@ bool updateBattle() {
                 drawBar(x, y, w, h, hp, max_hp, color);
             }
         } else {
-            // Dynamic animation finished, show outcome text
             if (typeModifierText == 1) { bState = 20; bTimer = 80; redrawBattleScene(); } 
             else if (typeModifierText == 2) { bState = 21; bTimer = 80; redrawBattleScene(); } 
             else if (passiveTriggered) { bState = 22; bTimer = 80; redrawBattleScene(); } 
@@ -505,7 +509,6 @@ bool updateBattle() {
     }
     else if (bState == 3) { 
         if (vijand_team[activeEnemyIdx].hp <= 0) {
-            // V2.8 CRASH FIX: ACCUMULATE pool ONCE when defeated
             if (stateChanged) {
                 xp_pool_accumulated += (vijand_team[activeEnemyIdx].lvl * 25);
             }
@@ -520,19 +523,15 @@ bool updateBattle() {
                 if (stateChanged) drawTextBox("ALL ENEMIES DEFEATED!", "YOU WIN!");
                 bTimer--; if (bTimer <= 0) { 
                     
-                    // **V2.8 PRO OVERHAUL: THE BIG PRE-CALCULATION BLOCK**
-                    // --- TECHNISCHE CRASH FIX: BEREKEN ALLES NU ---
                     int participants = 0;
                     for(int i=0; i<6; i++) { if(participated[i]) participants++; teamPending[i].levels_to_gain = 0; }
-                    if (participants == 0) participants = 1; // Failsafe
+                    if (participants == 0) participants = 1; 
 
                     int shared_xp = xp_pool_accumulated / participants;
                     xp_to_give = shared_xp; 
                     
-                    // Loop alle deelnemers
                     for(int i=0; i<6; i++) {
                         if(participated[i] && team[i].hp > 0) {
-                            // Pre-calc XP en Level
                             int tempLvl = team[i].lvl;
                             int tempXp = team[i].xp + shared_xp;
                             int tempXpNodig = team[i].xp_nodig;
@@ -550,7 +549,6 @@ bool updateBattle() {
                             teamPending[i].final_xp_val = tempXp;
                             teamPending[i].final_xp_nodig = tempXpNodig;
                             
-                            // Check Moves via tijdelijke instantie
                             teamPending[i].moves_learned_count = 0;
                             if(lvlGained > 0) {
                                 Karakter tK; initKarakter(&tK, team[i].char_id, tempLvl);
@@ -567,7 +565,6 @@ bool updateBattle() {
                                 }
                             }
                             
-                            // Check Evolutie
                             teamPending[i].evolution_triggered = false;
                             if(lvlGained > 0) {
                                 Karakter tE; tE = team[i]; 
@@ -578,7 +575,6 @@ bool updateBattle() {
                                 }
                             }
                             
-                            // --- PAS PERMANENTE WIJZIGINGEN NU TOE ---
                             team[i].lvl = tempLvl;
                             team[i].xp = tempXp;
                             team[i].xp_nodig = tempXpNodig;
@@ -590,7 +586,6 @@ bool updateBattle() {
                         }
                     }
                     
-                    // Setup visual XP animation voor ACTIEVE held
                     int activeOldXp = team[activeIdx].xp - shared_xp; 
                     if(activeOldXp < 0) activeOldXp = 0; 
                     target_xp = team[activeIdx].xp; 
@@ -600,7 +595,6 @@ bool updateBattle() {
                     xp_pool_accumulated = 0; 
                     levelupQueueCharIdx = 0; 
                     
-                    // V2.8 UX FIX: Skip XP animatie wachten als level up
                     if(teamPending[activeIdx].levels_to_gain > 0) {
                         levelupQueueCharIdx = activeIdx; 
                         bState = 16; stateChanged = true;
@@ -614,37 +608,43 @@ bool updateBattle() {
                 passiveTriggered = false; typeModifierText = 0;
                 drawTextBox(vijand_team[activeEnemyIdx].naam, vijand_team[activeEnemyIdx].moves[0].naam);
             }
-            if (bTimer == 45) { eOffX = -15; redrawBattleScene(); } 
-            if (bTimer == 35) { eOffX = 0; redrawBattleScene(); }
-            if (bTimer == 25) { pVis = false; redrawBattleScene(); } 
-            if (bTimer == 15) { pVis = true; redrawBattleScene(); }
-            if (bTimer == 5)  { pVis = false; redrawBattleScene(); }
+            
+            // V2.9 FIX: updateAttackAnim in plaats van redrawBattleScene()
+            if (bTimer == 45) { eOffX = -15; updateAttackAnim(); } 
+            if (bTimer == 35) { eOffX = 0; updateAttackAnim(); }
+            if (bTimer == 25) { pVis = false; updateAttackAnim(); } 
+            if (bTimer == 15) { pVis = true; updateAttackAnim(); }
+            if (bTimer == 5)  { pVis = false; updateAttackAnim(); }
 
             bTimer--;
             if (bTimer <= 0) {
                 pVis = true;
+                updateAttackAnim(); // Zorgt dat de speler niet verdwijnt na de flits!
+                
                 int damage = calculateDamage(&vijand_team[activeEnemyIdx], &team[activeIdx], &vijand_team[activeEnemyIdx].moves[0]);
                 
-                // V2.8 GFX: Setup dynamic HP animation voor Active held (Flicker Free)
                 dynamic_old_active_hp = team[activeIdx].hp;
                 team[activeIdx].hp -= damage;
                 if (team[activeIdx].hp < 0) team[activeIdx].hp = 0;
                 dynamic_target_active_hp = team[activeIdx].hp;
                 
-                bState = 35; // Transition VState 35 (HP Drop Active)
+                bState = 35; 
             }
         }
     }
-    // V2.8 GFX: Active Held HP animatie (Flicker Free)
     else if (bState == 35) { 
+        // V2.9 FIX: Skip de drain met A
+        if (isKeyJustPressed(KEY_A)) {
+            dynamic_old_active_hp = dynamic_target_active_hp; 
+        }
+
         if (dynamic_old_active_hp > dynamic_target_active_hp) {
             dynamic_anim_timer++;
-            if (dynamic_anim_timer > 1) { // dropping HP 
+            if (dynamic_anim_timer > 1) {  
                 dynamic_old_active_hp--; 
                 dynamic_anim_timer = 0;
                 
-                // FIX FLICKER: NIET redrawBattleScene(), teken ENKEL het balkje en HP numbers!
-                int x = 120, y = 85, w = 105, h = 5; // Active held bar coördinaten
+                int x = 120, y = 85, w = 105, h = 5; 
                 int max_hp = team[activeIdx].max_hp;
                 int hp = dynamic_old_active_hp;
                 
@@ -654,7 +654,6 @@ bool updateBattle() {
                 drawBar(x, y, w, h, hp, max_hp, color);
             }
         } else {
-            // Dynamic animation finished
             if (typeModifierText == 1) { bState = 30; bTimer = 80; redrawBattleScene(); } 
             else if (typeModifierText == 2) { bState = 31; bTimer = 80; redrawBattleScene(); } 
             else { bState = 4; bTimer = 60; redrawBattleScene(); }
@@ -691,29 +690,28 @@ bool updateBattle() {
         }
     }
     
-    // VState 11: XP Animatie (Alleen XP, geen levels meer berekenen!)
     else if (bState == 11) { 
         if (stateChanged) drawTextBox("TEAM GAINED XP!", "");
         
-        // We animeren visual data! `dynamic_anim_timer` bevat visualActiveXp
+        // V2.9 FIX: Skip de XP balk animatie met A
+        if (isKeyJustPressed(KEY_A)) {
+            dynamic_anim_timer = target_xp;
+        }
+
         if (dynamic_anim_timer < target_xp) {
             dynamic_anim_timer += 2; 
             if (dynamic_anim_timer > target_xp) dynamic_anim_timer = target_xp;
             
-            // FIX FLICKER: NIET redrawBattleScene(), teken ENKEL het blauwe balkje!
             drawBar(120, 94, 105, 2, dynamic_anim_timer, team[activeIdx].xp_nodig, BAR_BLUE);
             
         } else {
-            // Wacht NIET op A, direct exit state
             return true; 
         }
     }
 
-    // VState 16: Level Up Goud Schermen Queue UX Overhaul
     else if (bState == 16) { 
         if(stateChanged) {
             redrawBattleScene(); 
-            // V2.8 UX FIX: Goudgele duidelijke tekst!
             char l2[32];
             sprintf(l2, "HAS REACHED LVL %d!", team[levelupQueueCharIdx].lvl); 
             drawTextBox(team[levelupQueueCharIdx].naam, l2);
