@@ -76,6 +76,16 @@ bool passiveTriggered = false;
 // --- V2.7: TYPE NAMEN ARRAY ---
 char* typeAfk[5] = {"[FYS]", "[ KI]", "[CHA]", "[HAK]", "[DEV]"};
 
+// --- HOTFIX: getBaseType FUNCTIE ---
+int getBaseType(int char_id) {
+    if (char_id == 3 || char_id == 5) return 1; // Ki (Goku, Vegeta)
+    if (char_id == 4 || char_id == 7 || char_id == 8 || char_id == 9 || char_id == 10) return 2; // Chakra
+    if (char_id == 1 || char_id == 6) return 3; // Haki (Zoro, Shanks)
+    if (char_id == 0 || char_id == 2) return 4; // DF (Luffy, Kaido)
+    return 0; // Fysiek (Standaard)
+}
+// -----------------------------------
+
 void drawRect(int x, int y, int w, int h, uint16_t color) {
     for(int r = 0; r < h; r++) for(int c = 0; c < w; c++) drawPixel(x + c, y + r, color);
 }
