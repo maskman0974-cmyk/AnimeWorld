@@ -71,12 +71,9 @@ typedef struct {
     int moves_learned_count;
     char moves_names[4][20];
     int moves_kracht[4];
-    int moves_minLvl[4];
     int moves_effect[4];
-    int moves_element[4];
     bool evolution_triggered;
     char evolution_newname[20];
-    int evolution_hpgain;
     int final_xp_val;
     int final_xp_nodig;
 } PendingStats;
@@ -94,6 +91,11 @@ bool eVis = true;
 
 int typeModifierText = 0; 
 bool passiveTriggered = false;
+
+// MOVE LEARNER GLOBALS
+int learningCharIdx = 0;
+int learningMoveIdx = 0;
+int moveReplaceCursor = 0;
 
 char* typeAfk[5] = {"[FYS]", "[ KI]", "[CHA]", "[HAK]", "[DEV]"};
 
@@ -122,7 +124,7 @@ void drawBitmapSprite(int x, int y, int width, int height, const uint16_t* data)
     for (int r = 0; r < height; r++) {
         for (int c = 0; c < width; c++) {
             uint16_t color = data[r * width + c];
-            if (color != transColor && color != 0x7C1F && color != 0x0000) drawPixel(x + c, y + r, color);
+            if (color != transColor && color != 0x7C1F) drawPixel(x + c, y + r, color);
         }
     }
 }
@@ -147,30 +149,30 @@ void drawBar(int x, int y, int w, int h, int val, int max, uint16_t color) {
 }
 
 void drawBattleUI() {
-    drawUIBox(6, 8, 118, 34); 
-    drawText(vijand_team[activeEnemyIdx].naam, 10, 12, COLOR_WHITE);
+    drawUIBox(4, 4, 120, 40); 
+    drawText(vijand_team[activeEnemyIdx].naam, 8, 8, COLOR_WHITE);
     int eType = getBaseType(vijand_team[activeEnemyIdx].char_id);
-    drawText(typeAfk[eType], 70, 12, getTypeColor(eType));
-    drawText("LVL", 90, 12, COLOR_GOLD); 
-    drawNumber(vijand_team[activeEnemyIdx].lvl, 108, 12, COLOR_GOLD);
+    drawText(typeAfk[eType], 8, 18, getTypeColor(eType));
+    drawText("LVL", 85, 8, COLOR_GOLD); 
+    drawNumber(vijand_team[activeEnemyIdx].lvl, 105, 8, COLOR_GOLD);
     
     uint16_t vColor = BAR_GREEN;
     if (vijand_team[activeEnemyIdx].hp < vijand_team[activeEnemyIdx].max_hp / 2) vColor = BAR_YELLOW;
     if (vijand_team[activeEnemyIdx].hp < vijand_team[activeEnemyIdx].max_hp / 5) vColor = BAR_RED;
-    drawBar(12, 25, 100, 5, vijand_team[activeEnemyIdx].hp, vijand_team[activeEnemyIdx].max_hp, vColor);
+    drawBar(10, 30, 100, 5, vijand_team[activeEnemyIdx].hp, vijand_team[activeEnemyIdx].max_hp, vColor);
     
-    drawUIBox(116, 68, 120, 42); 
-    drawText(team[activeIdx].naam, 120, 72, COLOR_WHITE);
+    drawUIBox(116, 64, 120, 50); 
+    drawText(team[activeIdx].naam, 120, 68, COLOR_WHITE);
     int pType = getBaseType(team[activeIdx].char_id);
-    drawText(typeAfk[pType], 165, 72, getTypeColor(pType));
-    drawText("LVL", 195, 72, COLOR_GOLD); 
-    drawNumber(team[activeIdx].lvl, 215, 72, COLOR_GOLD);
+    drawText(typeAfk[pType], 120, 78, getTypeColor(pType));
+    drawText("LVL", 195, 68, COLOR_GOLD); 
+    drawNumber(team[activeIdx].lvl, 215, 68, COLOR_GOLD);
     
     uint16_t pColor = BAR_GREEN;
     if (team[activeIdx].hp < team[activeIdx].max_hp / 2) pColor = BAR_YELLOW;
     if (team[activeIdx].hp < team[activeIdx].max_hp / 5) pColor = BAR_RED;
-    drawBar(120, 85, 105, 5, team[activeIdx].hp, team[activeIdx].max_hp, pColor);
-    drawBar(120, 94, 105, 2, team[activeIdx].xp, team[activeIdx].xp_nodig, BAR_BLUE);
+    drawBar(120, 92, 105, 5, team[activeIdx].hp, team[activeIdx].max_hp, pColor);
+    drawBar(120, 102, 105, 2, team[activeIdx].xp, team[activeIdx].xp_nodig, BAR_BLUE);
 }
 
 void drawVFX() {
@@ -190,7 +192,6 @@ void drawVFX() {
     }
 }
 
-// V2.9 FIX: Functie om gericht achtergrond terug te tekenen zonder heel het scherm te wissen
 void restoreBG(int x, int y, int w, int h) {
     for(int r = 0; r < h; r++) {
         for(int c = 0; c < w; c++) {
@@ -201,14 +202,10 @@ void restoreBG(int x, int y, int w, int h) {
     }
 }
 
-// V2.9 FIX: Specifieke update loop voor de karakters en aanvallen
 void updateAttackAnim() {
     waitVBlank();
-    // Wis alleen de sprites uit met de achtergrond pixels! (De UI blijft intact)
-    restoreBG(24, 40, 80, 80);
-    restoreBG(135, 16, 80, 80);
+    restoreBG(0, 0, 240, 114);
 
-    // Teken Speler
     if (pVis) {
         if (team[activeIdx].char_id == 0 && team[activeIdx].status == 3) {
             const uint16_t* g5_kaart = (const uint16_t*)LuffyG5_cardBitmap;
@@ -222,13 +219,15 @@ void updateAttackAnim() {
         }
     }
 
-    // Teken Vijand
     if (eVis) drawBitmapSprite(150 + eOffX, 16, 64, 64, vijand_team[activeEnemyIdx].battle_front_bitmap);
 
     drawVFX();
+    
+    if (bState != 10 && bState != 12 && bState != 14) {
+        drawBattleUI();
+    }
 }
 
-// Dit is voor volledige scherm transities
 void redrawBattleScene() {
     waitVBlank(); 
     *(volatile uint32_t*)0x040000D4 = (uint32_t)battle_bgBitmap;
@@ -250,7 +249,7 @@ void redrawBattleScene() {
 
     if (eVis) drawBitmapSprite(150 + eOffX, 16, 64, 64, vijand_team[activeEnemyIdx].battle_front_bitmap);
 
-    if (bState != 10 && bState != 12 && bState != 14) {
+    if (bState != 10 && bState != 12 && bState != 14 && bState != 52) {
         drawBattleUI();
     }
 }
@@ -295,6 +294,8 @@ void startBattle(bool isStory) {
     for(int i=0; i<6; i++) { participated[i] = false; teamPending[i].levels_to_gain = 0; }
     participated[activeIdx] = true;
     xp_pool_accumulated = 0;
+    learningCharIdx = 0;
+    learningMoveIdx = 0;
 
     activeEnemyIdx = 0;
     for(int i=0; i<6; i++) vijand_team[i].isGevuld = false;
@@ -332,7 +333,6 @@ static int dynamic_target_vijand_hp = 0;
 static int dynamic_old_active_hp = 0;
 static int dynamic_target_active_hp = 0;
 static int dynamic_anim_timer = 0;
-static int levelupQueueCharIdx = 0; 
 
 bool updateBattle() {
     bool stateChanged = (bState != prevState);
@@ -445,7 +445,6 @@ bool updateBattle() {
             drawTextBox(team[activeIdx].naam, team[activeIdx].moves[bMoveSelect].naam);
         }
         
-        // V2.9 FIX: updateAttackAnim tekent alleen de karakters, geen geflikker meer
         if (bTimer == 35) { pOffX = 15; updateAttackAnim(); } 
         if (bTimer == 25) { pOffX = 0; updateAttackAnim(); } 
         if (bTimer == 15) { eVis = false; updateAttackAnim(); } 
@@ -455,7 +454,7 @@ bool updateBattle() {
         bTimer--;
         if (bTimer <= 0) {
             eVis = true; 
-            updateAttackAnim(); // Zorgt dat de vijand niet verdwijnt na de flits!
+            updateAttackAnim(); 
             
             int damage = calculateDamage(&team[activeIdx], &vijand_team[activeEnemyIdx], &team[activeIdx].moves[bMoveSelect]);
             
@@ -468,7 +467,6 @@ bool updateBattle() {
         }
     }
     else if (bState == 25) { 
-        // V2.9 FIX: Skip de drain met A
         if (isKeyJustPressed(KEY_A)) {
             dynamic_old_vijand_hp = dynamic_target_vijand_hp; 
         }
@@ -479,7 +477,7 @@ bool updateBattle() {
                 dynamic_old_vijand_hp--; 
                 dynamic_anim_timer = 0;
                 
-                int x = 12, y = 25, w = 100, h = 5;
+                int x = 10, y = 30, w = 100, h = 5;
                 int max_hp = vijand_team[activeEnemyIdx].max_hp;
                 int hp = dynamic_old_vijand_hp;
                 
@@ -559,6 +557,8 @@ bool updateBattle() {
                                         if(!alreadyHas) {
                                             int learnedIdx = teamPending[i].moves_learned_count;
                                             strcpy(teamPending[i].moves_names[learnedIdx], tK.moves[mI].naam);
+                                            teamPending[i].moves_kracht[learnedIdx] = tK.moves[mI].kracht;
+                                            teamPending[i].moves_effect[learnedIdx] = tK.moves[mI].effect;
                                             teamPending[i].moves_learned_count++;
                                         }
                                     }
@@ -581,7 +581,6 @@ bool updateBattle() {
                             team[i].max_hp += teamPending[i].max_hp_gain;
                             team[i].hp = team[i].max_hp; 
 
-                            checkNewMoves(&team[i]); 
                             if(teamPending[i].evolution_triggered) checkEvolutie(&team[i]); 
                         }
                     }
@@ -593,10 +592,9 @@ bool updateBattle() {
                     dynamic_anim_timer = activeOldXp; 
                     bState = 11; bTimer = 0; 
                     xp_pool_accumulated = 0; 
-                    levelupQueueCharIdx = 0; 
+                    learningCharIdx = activeIdx; 
                     
                     if(teamPending[activeIdx].levels_to_gain > 0) {
-                        levelupQueueCharIdx = activeIdx; 
                         bState = 16; stateChanged = true;
                     } else {
                         stateChanged = true;
@@ -609,7 +607,6 @@ bool updateBattle() {
                 drawTextBox(vijand_team[activeEnemyIdx].naam, vijand_team[activeEnemyIdx].moves[0].naam);
             }
             
-            // V2.9 FIX: updateAttackAnim in plaats van redrawBattleScene()
             if (bTimer == 45) { eOffX = -15; updateAttackAnim(); } 
             if (bTimer == 35) { eOffX = 0; updateAttackAnim(); }
             if (bTimer == 25) { pVis = false; updateAttackAnim(); } 
@@ -619,7 +616,7 @@ bool updateBattle() {
             bTimer--;
             if (bTimer <= 0) {
                 pVis = true;
-                updateAttackAnim(); // Zorgt dat de speler niet verdwijnt na de flits!
+                updateAttackAnim(); 
                 
                 int damage = calculateDamage(&vijand_team[activeEnemyIdx], &team[activeIdx], &vijand_team[activeEnemyIdx].moves[0]);
                 
@@ -633,7 +630,6 @@ bool updateBattle() {
         }
     }
     else if (bState == 35) { 
-        // V2.9 FIX: Skip de drain met A
         if (isKeyJustPressed(KEY_A)) {
             dynamic_old_active_hp = dynamic_target_active_hp; 
         }
@@ -644,7 +640,7 @@ bool updateBattle() {
                 dynamic_old_active_hp--; 
                 dynamic_anim_timer = 0;
                 
-                int x = 120, y = 85, w = 105, h = 5; 
+                int x = 120, y = 92, w = 105, h = 5; 
                 int max_hp = team[activeIdx].max_hp;
                 int hp = dynamic_old_active_hp;
                 
@@ -685,7 +681,12 @@ bool updateBattle() {
             if (team[activeIdx].hp <= 0) {
                 drawTextBox("YOU FAINTED...", ""); pVis = false; redrawBattleScene();
                 if (checkAliveTeam()) { bState = 10; teamSelect = 0; } 
-                else { drawTextBox("ALL HEROES FAINTED!", "GAME OVER..."); healWholeTeam(); return true; }
+                else { 
+                    drawTextBox("ALL HEROES FAINTED!", "GAME OVER..."); 
+                    healWholeTeam(); 
+                    vijand_team[0].hp = vijand_team[0].max_hp; 
+                    return true; 
+                }
             } else { bState = 1; }
         }
     }
@@ -693,7 +694,6 @@ bool updateBattle() {
     else if (bState == 11) { 
         if (stateChanged) drawTextBox("TEAM GAINED XP!", "");
         
-        // V2.9 FIX: Skip de XP balk animatie met A
         if (isKeyJustPressed(KEY_A)) {
             dynamic_anim_timer = target_xp;
         }
@@ -702,7 +702,7 @@ bool updateBattle() {
             dynamic_anim_timer += 2; 
             if (dynamic_anim_timer > target_xp) dynamic_anim_timer = target_xp;
             
-            drawBar(120, 94, 105, 2, dynamic_anim_timer, team[activeIdx].xp_nodig, BAR_BLUE);
+            drawBar(120, 102, 105, 2, dynamic_anim_timer, team[activeIdx].xp_nodig, BAR_BLUE);
             
         } else {
             return true; 
@@ -713,13 +713,80 @@ bool updateBattle() {
         if(stateChanged) {
             redrawBattleScene(); 
             char l2[32];
-            sprintf(l2, "HAS REACHED LVL %d!", team[levelupQueueCharIdx].lvl); 
-            drawTextBox(team[levelupQueueCharIdx].naam, l2);
+            sprintf(l2, "HAS REACHED LVL %d!", team[learningCharIdx].lvl); 
+            drawTextBox(team[learningCharIdx].naam, l2);
         }
         
         if (isKeyJustPressed(KEY_A)) {
             justEvolved = false; 
-            return true; 
+            if (teamPending[learningCharIdx].moves_learned_count > 0) {
+                bState = 50; 
+                learningMoveIdx = 0;
+            } else {
+                return true; 
+            }
+        }
+    }
+
+    else if (bState == 50) { 
+        if (stateChanged) {
+            char l1[32]; sprintf(l1, "%s WANTS TO LEARN", team[learningCharIdx].naam);
+            drawTextBox(l1, teamPending[learningCharIdx].moves_names[learningMoveIdx]);
+        }
+        if (isKeyJustPressed(KEY_A)) {
+            int count = 0;
+            for(int m=0; m<4; m++) { if(strcmp(team[learningCharIdx].moves[m].naam, "-") != 0) count++; }
+            
+            if (count < 4) {
+                strcpy(team[learningCharIdx].moves[count].naam, teamPending[learningCharIdx].moves_names[learningMoveIdx]);
+                team[learningCharIdx].moves[count].kracht = teamPending[learningCharIdx].moves_kracht[learningMoveIdx];
+                team[learningCharIdx].moves[count].effect = teamPending[learningCharIdx].moves_effect[learningMoveIdx];
+                bState = 51; 
+            } else {
+                bState = 52; 
+                moveReplaceCursor = 0;
+            }
+        }
+    }
+    else if (bState == 51) {
+        if (stateChanged) {
+            char l2[32]; sprintf(l2, "LEARNED %s!", teamPending[learningCharIdx].moves_names[learningMoveIdx]);
+            drawTextBox("SUCCESS!", l2);
+        }
+        if (isKeyJustPressed(KEY_A)) {
+            learningMoveIdx++;
+            if (learningMoveIdx < teamPending[learningCharIdx].moves_learned_count) {
+                bState = 50; 
+            } else {
+                return true; 
+            }
+        }
+    }
+    else if (bState == 52) {
+        if (stateChanged) {
+            redrawBattleScene();
+            drawUIBox(10, 10, 220, 100); 
+            drawText("FORGET WHICH MOVE?", 15, 15, COLOR_GOLD);
+        }
+        for(int m=0; m<4; m++) {
+            uint16_t color = (moveReplaceCursor == m) ? COLOR_RED : COLOR_WHITE;
+            drawText(team[learningCharIdx].moves[m].naam, 30, 30 + (m * 12), color);
+        }
+        uint16_t cColor = (moveReplaceCursor == 4) ? COLOR_RED : COLOR_WHITE;
+        drawText("DON'T LEARN NEW MOVE", 30, 30 + (4 * 12), cColor);
+        
+        if (isKeyJustPressed(KEY_DOWN)) { moveReplaceCursor = (moveReplaceCursor + 1) % 5; }
+        if (isKeyJustPressed(KEY_UP)) { moveReplaceCursor = (moveReplaceCursor + 4) % 5; }
+        if (isKeyJustPressed(KEY_A)) {
+            if (moveReplaceCursor == 4) {
+                learningMoveIdx++;
+                if (learningMoveIdx < teamPending[learningCharIdx].moves_learned_count) { bState = 50; } else { return true; }
+            } else {
+                strcpy(team[learningCharIdx].moves[moveReplaceCursor].naam, teamPending[learningCharIdx].moves_names[learningMoveIdx]);
+                team[learningCharIdx].moves[moveReplaceCursor].kracht = teamPending[learningCharIdx].moves_kracht[learningMoveIdx];
+                team[learningCharIdx].moves[moveReplaceCursor].effect = teamPending[learningCharIdx].moves_effect[learningMoveIdx];
+                bState = 51; 
+            }
         }
     }
 
