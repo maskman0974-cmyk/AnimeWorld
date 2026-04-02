@@ -58,12 +58,10 @@ int teamSelect = 0;
 int bBagCursor = 0; 
 bool justEvolved = false;
 
-// --- V2.7: DYNAMISCHE XP VARIABELEN ---
 int target_xp = 0;
 bool participated[6] = {false};
 int total_xp_pool = 0;
 int xp_to_give = 0;
-// --------------------------------------
 
 int pOffX = 0; 
 int eOffX = 0;
@@ -73,18 +71,15 @@ bool eVis = true;
 int typeModifierText = 0; 
 bool passiveTriggered = false;
 
-// --- V2.7: TYPE NAMEN ARRAY ---
 char* typeAfk[5] = {"[FYS]", "[ KI]", "[CHA]", "[HAK]", "[DEV]"};
 
-// --- HOTFIX: getBaseType FUNCTIE ---
 int getBaseType(int char_id) {
-    if (char_id == 3 || char_id == 5) return 1; // Ki (Goku, Vegeta)
-    if (char_id == 4 || char_id == 7 || char_id == 8 || char_id == 9 || char_id == 10) return 2; // Chakra
-    if (char_id == 1 || char_id == 6) return 3; // Haki (Zoro, Shanks)
-    if (char_id == 0 || char_id == 2) return 4; // DF (Luffy, Kaido)
-    return 0; // Fysiek (Standaard)
+    if (char_id == 3 || char_id == 5) return 1; 
+    if (char_id == 4 || char_id == 7 || char_id == 8 || char_id == 9 || char_id == 10) return 2; 
+    if (char_id == 1 || char_id == 6) return 3; 
+    if (char_id == 0 || char_id == 2) return 4; 
+    return 0; 
 }
-// -----------------------------------
 
 void drawRect(int x, int y, int w, int h, uint16_t color) {
     for(int r = 0; r < h; r++) for(int c = 0; c < w; c++) drawPixel(x + c, y + r, color);
@@ -122,9 +117,9 @@ void drawBar(int x, int y, int w, int h, int val, int max, uint16_t color) {
 void drawBattleUI() {
     drawUIBox(6, 8, 118, 34); 
     drawText(vijand_team[activeEnemyIdx].naam, 10, 12, COLOR_WHITE);
-    // V2.7: Type text naast de enemy
-    drawText(typeAfk[getBaseType(vijand_team[activeEnemyIdx].char_id)], 8, 22, COLOR_RED);
-    drawText("LVL", 88, 12, COLOR_GOLD); 
+    // V2.7 FIX: Type mooi in het Goud direct naast de naam
+    drawText(typeAfk[getBaseType(vijand_team[activeEnemyIdx].char_id)], 60, 12, COLOR_GOLD);
+    drawText("LVL", 90, 12, COLOR_GOLD); 
     drawNumber(vijand_team[activeEnemyIdx].lvl, 108, 12, COLOR_GOLD);
     
     uint16_t vColor = BAR_GREEN;
@@ -134,8 +129,8 @@ void drawBattleUI() {
     
     drawUIBox(116, 68, 120, 42); 
     drawText(team[activeIdx].naam, 120, 72, COLOR_WHITE);
-    // V2.7: Type text naast de player
-    drawText(typeAfk[getBaseType(team[activeIdx].char_id)], 118, 82, COLOR_RED);
+    // V2.7 FIX: Type mooi in het Goud direct naast de naam
+    drawText(typeAfk[getBaseType(team[activeIdx].char_id)], 165, 72, COLOR_GOLD);
     drawText("LVL", 195, 72, COLOR_GOLD); 
     drawNumber(team[activeIdx].lvl, 215, 72, COLOR_GOLD);
     
@@ -255,7 +250,6 @@ void startBattle(bool isStory) {
     pOffX = 0; eOffX = 0; pVis = true; eVis = true;
     justEvolved = false;
 
-    // V2.7: Reset deelname voor verdeling XP
     for(int i=0; i<6; i++) participated[i] = false;
     participated[activeIdx] = true;
     total_xp_pool = 0;
@@ -301,21 +295,27 @@ bool updateBattle() {
         if (bTimer <= 0) bState = 1;
     }
     else if (bState == 1) { 
-        if (stateChanged) drawTextBox(NULL, NULL); 
-        drawText("FIGHT", 20, 130, (bMenu == 0) ? COLOR_RED : COLOR_WHITE);
-        drawText("BAG",   120, 130, (bMenu == 1) ? COLOR_RED : COLOR_WHITE); 
-        drawText("TEAM",  20, 145, (bMenu == 2) ? COLOR_RED : COLOR_WHITE);
-        drawText("RUN",   120, 145, (bMenu == 3) ? COLOR_RED : COLOR_WHITE);
-
-        if (isKeyJustPressed(KEY_RIGHT)) { bMenu++; if(bMenu > 3) bMenu = 0; }
-        if (isKeyJustPressed(KEY_LEFT))  { bMenu--; if(bMenu < 0) bMenu = 3; }
-        if (isKeyJustPressed(KEY_DOWN))  { bMenu += 2; if(bMenu > 3) bMenu -= 4; }
-        if (isKeyJustPressed(KEY_UP))    { bMenu -= 2; if(bMenu < 0) bMenu += 4; }
+        bool menuNeedsRedraw = false;
+        if (stateChanged) { drawTextBox(NULL, NULL); menuNeedsRedraw = true; }
+        
+        if (isKeyJustPressed(KEY_RIGHT)) { bMenu++; if(bMenu > 3) bMenu = 0; menuNeedsRedraw = true; }
+        if (isKeyJustPressed(KEY_LEFT))  { bMenu--; if(bMenu < 0) bMenu = 3; menuNeedsRedraw = true; }
+        if (isKeyJustPressed(KEY_DOWN))  { bMenu += 2; if(bMenu > 3) bMenu -= 4; menuNeedsRedraw = true; }
+        if (isKeyJustPressed(KEY_UP))    { bMenu -= 2; if(bMenu < 0) bMenu += 4; menuNeedsRedraw = true; }
+        
+        // V2.7 FIX: Flikkering weggenomen. Tekent alleen als de cursor verplaatst!
+        if (menuNeedsRedraw) {
+            drawTextBox(NULL, NULL); 
+            drawText("FIGHT", 20, 130, (bMenu == 0) ? COLOR_RED : COLOR_WHITE);
+            drawText("BAG",   120, 130, (bMenu == 1) ? COLOR_RED : COLOR_WHITE); 
+            drawText("TEAM",  20, 145, (bMenu == 2) ? COLOR_RED : COLOR_WHITE);
+            drawText("RUN",   120, 145, (bMenu == 3) ? COLOR_RED : COLOR_WHITE);
+        }
         
         if (isKeyJustPressed(KEY_A)) {
             if (bMenu == 0) { bState = 5; bMoveSelect = 0; } 
-            else if (bMenu == 1) { bState = 14; bBagCursor = 0; redrawBattleScene(); } 
-            else if (bMenu == 2) { bState = 10; teamSelect = activeIdx; redrawBattleScene(); } 
+            else if (bMenu == 1) { bState = 14; bBagCursor = 0; } 
+            else if (bMenu == 2) { bState = 10; teamSelect = activeIdx; } 
             else if (bMenu == 3) { 
                 if (bBoss) { bState = 13; bTimer = 60; }
                 else { return true; } 
@@ -323,53 +323,68 @@ bool updateBattle() {
         }
     }
     else if (bState == 5) { 
-        if (stateChanged) drawTextBox("CHOOSE ATTACK:", ""); 
-        for(int i = 0; i < 4; i++) {
-            uint16_t color = (bMoveSelect == i) ? COLOR_RED : COLOR_WHITE;
-            if (strcmp(team[activeIdx].moves[i].naam, "-") != 0) {
-                drawText(team[activeIdx].moves[i].naam, 20 + (i%2)*100, 130 + (i/2)*15, color);
-            } else {
-                drawText("---", 20 + (i%2)*100, 130 + (i/2)*15, 0x3DEF); 
+        bool menuNeedsRedraw = false;
+        if (stateChanged) menuNeedsRedraw = true; 
+        
+        if (isKeyJustPressed(KEY_RIGHT)) { bMoveSelect++; if (bMoveSelect > 3) bMoveSelect = 0; menuNeedsRedraw = true; }
+        if (isKeyJustPressed(KEY_LEFT))  { bMoveSelect--; if (bMoveSelect < 0) bMoveSelect = 3; menuNeedsRedraw = true; }
+        if (isKeyJustPressed(KEY_DOWN))  { bMoveSelect += 2; if (bMoveSelect > 3) bMoveSelect -= 4; menuNeedsRedraw = true; }
+        if (isKeyJustPressed(KEY_UP))    { bMoveSelect -= 2; if (bMoveSelect < 0) bMoveSelect += 4; menuNeedsRedraw = true; }
+        
+        if (menuNeedsRedraw) {
+            drawTextBox("CHOOSE ATTACK:", ""); 
+            for(int i = 0; i < 4; i++) {
+                uint16_t color = (bMoveSelect == i) ? COLOR_RED : COLOR_WHITE;
+                if (strcmp(team[activeIdx].moves[i].naam, "-") != 0) {
+                    drawText(team[activeIdx].moves[i].naam, 20 + (i%2)*100, 130 + (i/2)*15, color);
+                } else {
+                    drawText("---", 20 + (i%2)*100, 130 + (i/2)*15, 0x3DEF); 
+                }
             }
         }
-        if (isKeyJustPressed(KEY_RIGHT)) { bMoveSelect++; if (bMoveSelect > 3) bMoveSelect = 0; }
-        if (isKeyJustPressed(KEY_LEFT))  { bMoveSelect--; if (bMoveSelect < 0) bMoveSelect = 3; }
-        if (isKeyJustPressed(KEY_DOWN))  { bMoveSelect += 2; if (bMoveSelect > 3) bMoveSelect -= 4; }
-        if (isKeyJustPressed(KEY_UP))    { bMoveSelect -= 2; if (bMoveSelect < 0) bMoveSelect += 4; }
+        
         if (isKeyJustPressed(KEY_A)) {
             if (strcmp(team[activeIdx].moves[bMoveSelect].naam, "-") != 0) { bState = 2; bTimer = 40; }
         }
         if (isKeyJustPressed(KEY_B)) { bState = 1; } 
     }
     else if (bState == 14) { 
-        if (stateChanged) { drawUIBox(10, 10, 220, 100); drawText("BATTLE BAG:", 15, 15, COLOR_GOLD); }
-        for(int i = 0; i < 4; i++) { 
-            uint16_t color = (bBagCursor == i) ? COLOR_RED : COLOR_WHITE;
-            if (itemAantal[i] <= 0) color = 0x3DEF; 
-            drawText(itemNamen[i], 30, 30 + (i * 15), color);
-            drawText("x", 170, 30 + (i * 15), color); drawNumber(itemAantal[i], 180, 30 + (i * 15), color);
+        bool menuNeedsRedraw = false;
+        if (stateChanged) menuNeedsRedraw = true;
+        
+        if (isKeyJustPressed(KEY_DOWN)) { bBagCursor = (bBagCursor + 1) % 4; menuNeedsRedraw = true; }
+        if (isKeyJustPressed(KEY_UP)) { bBagCursor = (bBagCursor + 3) % 4; menuNeedsRedraw = true; }
+        
+        if (menuNeedsRedraw) {
+            drawUIBox(10, 10, 220, 100);
+            drawText("BATTLE BAG:", 15, 15, COLOR_GOLD);
+            for(int i = 0; i < 4; i++) { 
+                uint16_t color = (bBagCursor == i) ? COLOR_RED : COLOR_WHITE;
+                if (itemAantal[i] <= 0) color = 0x3DEF; 
+                drawText(itemNamen[i], 30, 30 + (i * 15), color);
+                drawText("x", 170, 30 + (i * 15), color); drawNumber(itemAantal[i], 180, 30 + (i * 15), color);
+            }
         }
-        if (isKeyJustPressed(KEY_DOWN)) { bBagCursor = (bBagCursor + 1) % 4; redrawBattleScene(); }
-        if (isKeyJustPressed(KEY_UP)) { bBagCursor = (bBagCursor + 3) % 4; redrawBattleScene(); }
+
         if (isKeyJustPressed(KEY_A)) {
             if (itemAantal[bBagCursor] > 0) {
                 if (bBagCursor == 3) { 
-                    itemAantal[3]--; bState = 7; bTimer = 60; 
+                    itemAantal[3]--; bState = 7; bTimer = 60; redrawBattleScene();
                 } else if (itemHeal[bBagCursor] > 0) { 
                     itemAantal[bBagCursor]--; team[activeIdx].hp += itemHeal[bBagCursor];
                     if (team[activeIdx].hp > team[activeIdx].max_hp) team[activeIdx].hp = team[activeIdx].max_hp;
-                    bState = 15; bTimer = 40; 
+                    bState = 15; bTimer = 40; redrawBattleScene();
                 }
             }
         }
         if (isKeyJustPressed(KEY_B)) { redrawBattleScene(); bState = 1; }
     }
     else if (bState == 15) { 
-        if (stateChanged) { redrawBattleScene(); drawTextBox(team[activeIdx].naam, "RECOVERED HP!"); }
+        if (stateChanged) { drawTextBox(team[activeIdx].naam, "RECOVERED HP!"); }
         bTimer--; if (bTimer <= 0) { bState = 3; bTimer = 60; } 
     }
     else if (bState == 7) { 
-        if (stateChanged) { redrawBattleScene(); drawTextBox("YOU THREW A", "CAPTURE NET!"); }
+        if (stateChanged) { drawTextBox("YOU THREW A", "CAPTURE NET!"); }
         if (bTimer == 50) { eVis = false; redrawBattleScene(); }
         if (bTimer == 40) { eVis = true; redrawBattleScene(); }
         if (bTimer == 30) { eVis = false; redrawBattleScene(); }
@@ -436,8 +451,10 @@ bool updateBattle() {
     else if (bState == 3) { 
         if (vijand_team[activeEnemyIdx].hp <= 0) {
             
-            // V2.7: Vijand verslagen -> Voeg zijn level * 25 toe aan de XP pot!
-            total_xp_pool += (vijand_team[activeEnemyIdx].lvl * 25);
+            // V2.7 CRASH FIX: Voegt XP EENMALIG toe, niet 60 keer!
+            if (stateChanged) {
+                total_xp_pool += (vijand_team[activeEnemyIdx].lvl * 25);
+            }
 
             int nextIdx = -1;
             for(int i = activeEnemyIdx + 1; i < 6; i++) { if (vijand_team[i].isGevuld && vijand_team[i].hp > 0) { nextIdx = i; break; } }
@@ -505,21 +522,17 @@ bool updateBattle() {
         }
     }
     
-    // --- V2.7: XP DISTRIBUTIE & FLICKER FIX ---
     else if (bState == 11) { 
         if (stateChanged) { 
-            // Bereken hoeveel deelnemers er waren
             int participants = 0;
             for(int i=0; i<6; i++) { if(participated[i]) participants++; }
-            if (participants == 0) participants = 1; // Failsafe
+            if (participants == 0) participants = 1; 
             
             xp_to_give = total_xp_pool / participants;
             
-            // Geef de bankzitters die hebben gevochten direct hun deel
             for(int i=0; i<6; i++) {
                 if(participated[i] && i != activeIdx && team[i].hp > 0) {
                     team[i].xp += xp_to_give;
-                    // Mocht een bankzitter levelen:
                     while(team[i].xp >= team[i].xp_nodig) {
                         team[i].lvl++;
                         team[i].xp -= team[i].xp_nodig;
@@ -532,20 +545,19 @@ bool updateBattle() {
                 }
             }
             
-            // Stel de animatie in voor de actieve vechter
             target_xp = team[activeIdx].xp + xp_to_give;
             drawTextBox("TEAM GAINED XP!", "");
         }
         
         if (team[activeIdx].xp < target_xp) {
-            team[activeIdx].xp += 2; 
+            // V2.7 FIX: Versnelde XP balk bij grote XP amounts
+            int step = ((target_xp - team[activeIdx].xp) > 50) ? 5 : 2;
+            team[activeIdx].xp += step; 
             if (team[activeIdx].xp > target_xp) team[activeIdx].xp = target_xp;
             
-            // FIX FLICKER: NIET redrawBattleScene(), teken ENKEL het blauwe balkje!
             drawBar(120, 94, 105, 2, team[activeIdx].xp, team[activeIdx].xp_nodig, BAR_BLUE);
             
         } else {
-            // Wacht op druk op de A knop
             drawTextBox("PRESS A TO CONTINUE", "");
             if (isKeyJustPressed(KEY_A)) {
                 if (team[activeIdx].xp >= team[activeIdx].xp_nodig) {
@@ -557,7 +569,6 @@ bool updateBattle() {
         }
     }
 
-    // --- V2.7: LEVEL UP DRUK KNOP ---
     else if (bState == 16) { 
         if (stateChanged) { 
             team[activeIdx].lvl++;
@@ -575,7 +586,6 @@ bool updateBattle() {
             checkNewMoves(&team[activeIdx]);
             if (checkEvolutie(&team[activeIdx])) { justEvolved = true; }
             
-            // Mocht hij mega veel XP hebben gekregen en wéér levelen
             if (team[activeIdx].xp >= team[activeIdx].xp_nodig) {
                 bState = 16; stateChanged = true; 
             } else {
@@ -583,23 +593,33 @@ bool updateBattle() {
             }
         }
     }
-    // ------------------------------------
 
     else if (bState == 10) { 
-        if (stateChanged) {
-            drawUIBox(10, 10, 220, 100); drawText("SELECT FIGHTER:", 15, 15, COLOR_GOLD);
+        bool menuNeedsRedraw = false;
+        if (stateChanged) menuNeedsRedraw = true;
+
+        if (isKeyJustPressed(KEY_DOWN)) { 
+            do { teamSelect = (teamSelect + 1) % 6; } while(!team[teamSelect].isGevuld); 
+            menuNeedsRedraw = true; 
         }
-        for(int i = 0; i < 6; i++) {
-            if(team[i].isGevuld) {
-                uint16_t color = (teamSelect == i) ? COLOR_RED : COLOR_WHITE; if(team[i].hp <= 0) color = 0x3DEF; 
-                drawText(team[i].naam, 30, 30 + (i * 12), color); drawNumber(team[i].hp, 150, 30 + (i * 12), color);
+        if (isKeyJustPressed(KEY_UP)) { 
+            do { teamSelect = (teamSelect - 1 + 6) % 6; } while(!team[teamSelect].isGevuld); 
+            menuNeedsRedraw = true; 
+        }
+
+        if (menuNeedsRedraw) {
+            drawUIBox(10, 10, 220, 100); drawText("SELECT FIGHTER:", 15, 15, COLOR_GOLD);
+            for(int i = 0; i < 6; i++) {
+                if(team[i].isGevuld) {
+                    uint16_t color = (teamSelect == i) ? COLOR_RED : COLOR_WHITE; if(team[i].hp <= 0) color = 0x3DEF; 
+                    drawText(team[i].naam, 30, 30 + (i * 12), color); drawNumber(team[i].hp, 150, 30 + (i * 12), color);
+                }
             }
         }
-        if (isKeyJustPressed(KEY_DOWN)) do { teamSelect = (teamSelect + 1) % 6; } while(!team[teamSelect].isGevuld);
-        if (isKeyJustPressed(KEY_UP)) do { teamSelect = (teamSelect - 1 + 6) % 6; } while(!team[teamSelect].isGevuld);
+
         if (isKeyJustPressed(KEY_A)) {
             if (team[teamSelect].hp > 0 && teamSelect != activeIdx) {
-                activeIdx = teamSelect; pVis = true; redrawBattleScene(); bState = 12; bTimer = 40;
+                activeIdx = teamSelect; pVis = true; bState = 12; bTimer = 40; redrawBattleScene();
             }
         }
         if (isKeyJustPressed(KEY_B)) { if (team[activeIdx].hp > 0) { redrawBattleScene(); bState = 1; } }
@@ -607,7 +627,6 @@ bool updateBattle() {
     else if (bState == 12) { 
         if (stateChanged) { 
             drawTextBox("GO!", team[activeIdx].naam); 
-            // V2.7: Markeer dat deze speler nu ook recht heeft op de XP
             participated[activeIdx] = true; 
         }
         bTimer--; if (bTimer <= 0) bState = 1;
