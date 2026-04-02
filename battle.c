@@ -1,7 +1,7 @@
 #include "gamedata.h"
 #include "sound.h"
 #include <stdlib.h>
-#include <stdio.h> // Voor sprintf
+#include <stdio.h> 
 #include <string.h>
 
 #include "battle_bg.h"
@@ -84,6 +84,7 @@ typedef struct {
 } PendingStats;
 
 PendingStats teamPending[6]; // Slaat uitkomsten op voor iedereen
+bool participated[6] = {false}; // Bijhouden wie XP mag krijgen
 int xp_pool_accumulated = 0; // Telt XP op tijdens het gevecht
 int xp_to_give = 0; // Bevat shared_xp voor de actieve held's animatie
 int target_xp = 0; // Voor de animatie
@@ -333,7 +334,6 @@ static int dynamic_anim_timer = 0;
 
 // V2.8 globals voor pre-calculated victory
 static int levelupQueueCharIdx = 0; // Tracks wie we displayen
-static int levelupQueuePage = 0; // Tracks move/evolute page
 
 bool updateBattle() {
     bool stateChanged = (bState != prevState);
@@ -467,7 +467,6 @@ bool updateBattle() {
     }
     // V2.8 GFX: Vijand HP animatie (Flicker Free)
     else if (bState == 25) { 
-        // specialized drawing updates VRAM location.
         if (dynamic_old_vijand_hp > dynamic_target_vijand_hp) {
             dynamic_anim_timer++;
             if (dynamic_anim_timer > 1) { // dropping HP 
@@ -528,9 +527,9 @@ bool updateBattle() {
                     if (participants == 0) participants = 1; // Failsafe
 
                     int shared_xp = xp_pool_accumulated / participants;
-                    xp_to_give = shared_xp; // Still needed for V11 Active animation
+                    xp_to_give = shared_xp; 
                     
-                    // Loop alle deelnemers (actief en bank)
+                    // Loop alle deelnemers
                     for(int i=0; i<6; i++) {
                         if(participated[i] && team[i].hp > 0) {
                             // Pre-calc XP en Level
@@ -546,13 +545,12 @@ bool updateBattle() {
                                 lvlGained++;
                             }
                             
-                            // Sla rekenkundige uitkomsten op
                             teamPending[i].levels_to_gain = lvlGained;
                             teamPending[i].max_hp_gain = lvlGained * 10;
                             teamPending[i].final_xp_val = tempXp;
                             teamPending[i].final_xp_nodig = tempXpNodig;
                             
-                            // Check Moves (gebruik een tijdelijk Karakter)
+                            // Check Moves via tijdelijke instantie
                             teamPending[i].moves_learned_count = 0;
                             if(lvlGained > 0) {
                                 Karakter tK; initKarakter(&tK, team[i].char_id, tempLvl);
@@ -569,12 +567,11 @@ bool updateBattle() {
                                 }
                             }
                             
-                            // Check Evolutie (gebruik een TEMP character)
+                            // Check Evolutie
                             teamPending[i].evolution_triggered = false;
                             if(lvlGained > 0) {
-                                Karakter tE; tE = team[i]; // Kopie
-                                tE.lvl = tempLvl; // Set new lvl
-                                // Gebruik de gamedata checkEvolutie (modificeert tE, niet team[i])
+                                Karakter tE; tE = team[i]; 
+                                tE.lvl = tempLvl; 
                                 if(checkEvolutie(&tE)) { 
                                     teamPending[i].evolution_triggered = true;
                                     strcpy(teamPending[i].evolution_newname, tE.naam);
@@ -582,41 +579,32 @@ bool updateBattle() {
                             }
                             
                             // --- PAS PERMANENTE WIJZIGINGEN NU TOE ---
-                            // Arithmetic base Level-up stats
                             team[i].lvl = tempLvl;
                             team[i].xp = tempXp;
                             team[i].xp_nodig = tempXpNodig;
                             team[i].max_hp += teamPending[i].max_hp_gain;
-                            team[i].hp = team[i].max_hp; // Heal on level up
+                            team[i].hp = team[i].max_hp; 
 
-                            // Leer Moves (apply permanently)
                             checkNewMoves(&team[i]); 
-                            
-                            // Evolueer (Permanently modify team[i])
-                            if(teamPending[i].evolution_triggered) {
-                                checkEvolutie(&team[i]); 
-                            }
+                            if(teamPending[i].evolution_triggered) checkEvolutie(&team[i]); 
                         }
                     }
                     
                     // Setup visual XP animation voor ACTIEVE held
-                    // Visual XP bar moet OldLvl OldXp -> NewXp animeren.
-                    int activeOldXp = team[activeIdx].xp - shared_xp; // This might be negative visually
+                    int activeOldXp = team[activeIdx].xp - shared_xp; 
                     if(activeOldXp < 0) activeOldXp = 0; 
-                    target_xp = team[activeIdx].xp; // Final XP target
+                    target_xp = team[activeIdx].xp; 
 
-                    // bState = 11: Setup visual state
-                    dynamic_anim_timer = activeOldXp; // We hergebruiken dynamic_anim_timer als visualXp counter
-                    bState = 11; bTimer = 0; // State changed handles initialization
-                    xp_pool_accumulated = 0; // Reset pool
-                    levelupQueueCharIdx = 0; // Reset display queue
+                    dynamic_anim_timer = activeOldXp; 
+                    bState = 11; bTimer = 0; 
+                    xp_pool_accumulated = 0; 
+                    levelupQueueCharIdx = 0; 
                     
-                    // V2.8 UX FIX: Skip XP animatie als levels gained, ga direct naar goudgele "Has reached Lvl X"
+                    // V2.8 UX FIX: Skip XP animatie wachten als level up
                     if(teamPending[activeIdx].levels_to_gain > 0) {
-                        levelupQueueCharIdx = 0; // Start bij Active
+                        levelupQueueCharIdx = activeIdx; 
                         bState = 16; stateChanged = true;
                     } else {
-                        // Alleen XP animatie nodig
                         stateChanged = true;
                     }
                 } 
@@ -713,11 +701,10 @@ bool updateBattle() {
             if (dynamic_anim_timer > target_xp) dynamic_anim_timer = target_xp;
             
             // FIX FLICKER: NIET redrawBattleScene(), teken ENKEL het blauwe balkje!
-            // Gebruik visual data coördinaten van Active held
             drawBar(120, 94, 105, 2, dynamic_anim_timer, team[activeIdx].xp_nodig, BAR_BLUE);
             
         } else {
-            // Wacht NIET op A.
+            // Wacht NIET op A, direct exit state
             return true; 
         }
     }
@@ -733,10 +720,7 @@ bool updateBattle() {
         }
         
         if (isKeyJustPressed(KEY_A)) {
-            // Check pending data (Moves, Evolutie)
-            justEvolved = false;
-            
-            // Final transition back to VState 1.
+            justEvolved = false; 
             return true; 
         }
     }
@@ -763,7 +747,6 @@ bool updateBattle() {
     else if (bState == 12) { 
         if (stateChanged) { 
             drawTextBox("GO!", team[activeIdx].naam); 
-            // Markeer dat deze speler nu ook recht heeft op de XP
             participated[activeIdx] = true; 
         }
         bTimer--; if (bTimer <= 0) bState = 1;
