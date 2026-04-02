@@ -11,6 +11,16 @@
 #include "shibuya.h"
 #include "luffy.h" 
 
+// --- NIEUWE MAPS & CUTSCENES ---
+#include "wano_bamboo.h"
+#include "marineford_ice.h"
+#include "konoha_river.h"
+#include "madara_cutscene.h"
+#include "Vegeta_cutscene.h"
+#include "Kaido_cutscene.h"
+#include "Zoro_cutscene.h"
+// -------------------------------
+
 #include "LuffyG5_card.h"
 #include "Zoro_card.h"
 #include "Shanks_card.h"
@@ -41,17 +51,6 @@ extern bool updateBattle(void);
 extern void drawBitmapSprite(int x, int y, int width, int height, const uint16_t* data);
 extern int getEmptyPartySlot(void);
 extern int getEmptyPcSlot(void);
-
-void drawTradingCard(const void* bitmapData) {
-    const uint16_t* bitmap = (const uint16_t*)bitmapData; 
-    volatile uint16_t* vram = (volatile uint16_t*)0x06000000;
-    
-    for(int y = 0; y < 80; y++) {
-        for(int x = 0; x < 64; x++) {
-            vram[(y + 10) * 240 + (x + 88)] = bitmap[y * 64 + x];
-        }
-    }
-}
 
 void drawRectMain(int x, int y, int w, int h, uint16_t color) {
     volatile uint16_t* vram = (volatile uint16_t*)0x06000000;
@@ -88,6 +87,7 @@ bool hasDragonBall = false;
 bool hasMasterNet = false;
 int colosseumWave = 1;
 int prevRegio = 0;
+int active_cutscene = 0; 
 
 void updateInput() { 
     previous_keys = current_keys; 
@@ -103,33 +103,6 @@ void copy16(const void* src, volatile uint16_t* dest, int sizeInBytes) {
     for(int i = 0; i < numberOfShorts; i++) { dest[i] = src16[i]; }
 }
 
-void loadMap() {
-    REG_BG0CNT = 0x1F00; 
-    if (regio == 0) {
-        copy16(bgPal, (volatile uint16_t*)0x05000000, bgPalLen);
-        copy16(bgTiles, (volatile uint16_t*)0x06000000, bgTilesLen);
-        copy16(bgMap, (volatile uint16_t*)0x0600F800, bgMapLen);
-    } else if (regio == 1) {
-        copy16(marinefordPal, (volatile uint16_t*)0x05000000, marinefordPalLen);
-        copy16(marinefordTiles, (volatile uint16_t*)0x06000000, marinefordTilesLen);
-        copy16(marinefordMap, (volatile uint16_t*)0x0600F800, marinefordMapLen);
-    } else if (regio == 2) {
-        copy16(alabastaPal, (volatile uint16_t*)0x05000000, alabastaPalLen);
-        copy16(alabastaTiles, (volatile uint16_t*)0x06000000, alabastaTilesLen);
-        copy16(alabastaMap, (volatile uint16_t*)0x0600F800, alabastaMapLen);
-    } else if (regio == 3) {
-        copy16(konohaPal, (volatile uint16_t*)0x05000000, konohaPalLen);
-        copy16(konohaTiles, (volatile uint16_t*)0x06000000, konohaTilesLen);
-        copy16(konohaMap, (volatile uint16_t*)0x0600F800, konohaMapLen);
-    } else if (regio == 4) {
-        copy16(shibuyaPal, (volatile uint16_t*)0x05000000, shibuyaPalLen);
-        copy16(shibuyaTiles, (volatile uint16_t*)0x06000000, shibuyaTilesLen);
-        copy16(shibuyaMap, (volatile uint16_t*)0x0600F800, shibuyaMapLen);
-    }
-    copy16(luffyPal, (volatile uint16_t*)0x05000200, luffyPalLen);
-    copy16(luffyTiles, (volatile uint16_t*)0x06010000, luffyTilesLen);
-}
-
 int state = 0;
 int worldX = 120, worldY = 80;
 static bool stateChanged = true;
@@ -140,6 +113,52 @@ int regio_stage[6] = {1, 1, 1, 1, 1, 1};
 int side_quest_stage[6] = {0, 0, 0, 0, 0, 0}; 
 int interactie_npc = 0; 
 int dialoguePage = 0; 
+
+// --- DYNAMISCHE MAP LOADER ---
+void loadMap() {
+    REG_BG0CNT = 0x1F00; 
+    if (regio == 0) {
+        if (regio_stage[0] >= 3) {
+            copy16(wano_bambooPal, (volatile uint16_t*)0x05000000, wano_bambooPalLen);
+            copy16(wano_bambooTiles, (volatile uint16_t*)0x06000000, wano_bambooTilesLen);
+            copy16(wano_bambooMap, (volatile uint16_t*)0x0600F800, wano_bambooMapLen);
+        } else {
+            copy16(bgPal, (volatile uint16_t*)0x05000000, bgPalLen);
+            copy16(bgTiles, (volatile uint16_t*)0x06000000, bgTilesLen);
+            copy16(bgMap, (volatile uint16_t*)0x0600F800, bgMapLen);
+        }
+    } else if (regio == 1) {
+        if (regio_stage[1] >= 3) {
+            copy16(marineford_icePal, (volatile uint16_t*)0x05000000, marineford_icePalLen);
+            copy16(marineford_iceTiles, (volatile uint16_t*)0x06000000, marineford_iceTilesLen);
+            copy16(marineford_iceMap, (volatile uint16_t*)0x0600F800, marineford_iceMapLen);
+        } else {
+            copy16(marinefordPal, (volatile uint16_t*)0x05000000, marinefordPalLen);
+            copy16(marinefordTiles, (volatile uint16_t*)0x06000000, marinefordTilesLen);
+            copy16(marinefordMap, (volatile uint16_t*)0x0600F800, marinefordMapLen);
+        }
+    } else if (regio == 2) {
+        copy16(alabastaPal, (volatile uint16_t*)0x05000000, alabastaPalLen);
+        copy16(alabastaTiles, (volatile uint16_t*)0x06000000, alabastaTilesLen);
+        copy16(alabastaMap, (volatile uint16_t*)0x0600F800, alabastaMapLen);
+    } else if (regio == 3) {
+        if (regio_stage[3] >= 3) {
+            copy16(konoha_riverPal, (volatile uint16_t*)0x05000000, konoha_riverPalLen);
+            copy16(konoha_riverTiles, (volatile uint16_t*)0x06000000, konoha_riverTilesLen);
+            copy16(konoha_riverMap, (volatile uint16_t*)0x0600F800, konoha_riverMapLen);
+        } else {
+            copy16(konohaPal, (volatile uint16_t*)0x05000000, konohaPalLen);
+            copy16(konohaTiles, (volatile uint16_t*)0x06000000, konohaTilesLen);
+            copy16(konohaMap, (volatile uint16_t*)0x0600F800, konohaMapLen);
+        }
+    } else if (regio == 4) {
+        copy16(shibuyaPal, (volatile uint16_t*)0x05000000, shibuyaPalLen);
+        copy16(shibuyaTiles, (volatile uint16_t*)0x06000000, shibuyaTilesLen);
+        copy16(shibuyaMap, (volatile uint16_t*)0x0600F800, shibuyaMapLen);
+    }
+    copy16(luffyPal, (volatile uint16_t*)0x05000200, luffyPalLen);
+    copy16(luffyTiles, (volatile uint16_t*)0x06010000, luffyTilesLen);
+}
 
 int main() {
     initSound(); 
@@ -156,7 +175,7 @@ int main() {
                 drawRectMain(0, 0, 240, 160, 0x1084); 
                 drawUIBoxMain(40, 30, 160, 80);
                 drawText("ANIME WORLD", 80, 50, COLOR_GOLD); 
-                drawText("V2.7 QUESTS & XP", 60, 70, COLOR_WHITE); 
+                drawText("V3.0 CUTSCENES", 60, 70, COLOR_WHITE); 
                 drawText("PRESS START", 80, 130, COLOR_WHITE); 
                 stateChanged = false;
             }
@@ -202,7 +221,6 @@ int main() {
             int playerScreenY = worldY - camY;
             setSpriteAttribute(0, playerScreenX, playerScreenY, 0, 0, 0, 1); 
 
-            // VASTE BOSS
             int npcX = 200; 
             int npcY = 80;
             if (regio_stage[regio] <= 5) {
@@ -213,7 +231,6 @@ int main() {
                 } else { setSpriteAttribute(1, 0, 160, 0, 0, 0, 1); }
             } else { setSpriteAttribute(1, 0, 160, 0, 0, 0, 1); }
 
-            // SIDE QUEST NPC
             int questX = 80;
             int questY = 140;
             int qx = questX - camX; 
@@ -222,7 +239,6 @@ int main() {
                 setSpriteAttribute(3, qx, qy, 0, 0, 0, 1);
             } else { setSpriteAttribute(3, 0, 160, 0, 0, 0, 1); }
 
-            // NURSE JOY
             int nx = 40 - camX; int ny = 40 - camY;
             if (nx > -16 && nx < 240 && ny > -16 && ny < 160) {
                 setSpriteAttribute(2, nx, ny, 0, 0, 0, 1);
@@ -282,26 +298,40 @@ int main() {
             }
             if (isKeyJustPressed(KEY_A)) { state = 1; stateChanged = true; }
         }
+        // --- NIEUW: FULL SCREEN CUTSCENE LOADER ---
         else if (state == 100) { 
             if (stateChanged) {
                 REG_DISPCNT = 0x0403; 
-                drawRectMain(0, 0, 240, 160, COLOR_BLACK); 
-                drawUIBoxMain(10, 10, 220, 100);
-                drawText("--- ANIME CUTSCENE ---", 40, 40, COLOR_GOLD);
-                drawText("(INSERT YOUR PNG HERE LATER)", 20, 60, COLOR_WHITE);
-                drawTextBox("MADARA:", "PREPARE TO BE CRUSHED!");
+                const uint16_t* img = NULL;
+                
+                if (active_cutscene == 0) img = (const uint16_t*)Zoro_cutsceneBitmap;
+                else if (active_cutscene == 1) img = (const uint16_t*)Kaido_cutsceneBitmap;
+                else if (active_cutscene == 2) img = (const uint16_t*)Vegeta_cutsceneBitmap;
+                else if (active_cutscene == 3) img = (const uint16_t*)madara_cutsceneBitmap;
+
+                volatile uint16_t* vram = (volatile uint16_t*)0x06000000;
+                if (img != NULL) {
+                    for(int i = 0; i < 38400; i++) vram[i] = img[i];
+                }
+
+                drawUIBoxMain(10, 110, 220, 45);
+                if (active_cutscene == 0) drawTextBox("ZORO: I'LL SHOW YOU", "THE POWER OF THREE SWORDS.");
+                if (active_cutscene == 1) drawTextBox("KAIDO: WORORO! YOU BRATS", "CANNOT DEFEAT ME!");
+                if (active_cutscene == 2) drawTextBox("VEGETA: FAREWELL,", "BULMA... TRUNKS...");
+                if (active_cutscene == 3) drawTextBox("MADARA: HOW WILL YOU", "HANDLE A SECOND METEOR?");
+                
                 stateChanged = false;
             }
             if (isKeyJustPressed(KEY_A)) {
                 state = 2; startBattle(true); stateChanged = true;
             }
         }
+        // ------------------------------------------
+
         else if (state == 9) { 
             if (stateChanged) {
-                REG_DISPCNT = 0x0403; 
-                drawRectMain(0, 0, 240, 160, 0x2108); 
-                drawUIBoxMain(10, 10, 220, 140); 
-                drawText("NURSE JOY'S DESK", 65, 20, COLOR_GOLD);
+                REG_DISPCNT = 0x0403; drawRectMain(0, 0, 240, 160, 0x2108); 
+                drawUIBoxMain(10, 10, 220, 140); drawText("NURSE JOY'S DESK", 65, 20, COLOR_GOLD);
                 drawText("BERRIES:", 20, 40, COLOR_WHITE); drawNumber(berries, 90, 40, COLOR_GREEN);
                 
                 drawText("1. HEAL TEAM (FREE)", 30, 60, (shopCursor==0?COLOR_RED:COLOR_WHITE));
@@ -309,7 +339,7 @@ int main() {
                 drawText("3. BUY NET (200B)", 30, 90, (shopCursor==2?COLOR_RED:COLOR_WHITE));
                 drawText("4. ACCESS PC BOX", 30, 105, (shopCursor==3?COLOR_RED:COLOR_WHITE));
                 if (gameCleared) {
-                    drawText("5. COLOSSEUM (ENDGAME)", 30, 120, (shopCursor==4?COLOR_RED:COLOR_WHITE));
+                    drawText("5. COLOSSEUM", 30, 120, (shopCursor==4?COLOR_RED:COLOR_WHITE));
                     drawText("6. EXIT", 30, 135, (shopCursor==5?COLOR_RED:COLOR_WHITE));
                 } else {
                     drawText("5. EXIT", 30, 120, (shopCursor==4?COLOR_RED:COLOR_WHITE));
@@ -409,7 +439,6 @@ int main() {
                     if (pcBox[i].isGevuld) {
                         if (pcCursor == i) {
                             drawText(pcBox[i].naam, 30, 50, COLOR_RED); drawText("LVL", 150, 50, COLOR_RED); drawNumber(pcBox[i].lvl, 180, 50, COLOR_RED);
-                            drawBitmapSprite(88, 70, 64, 64, pcBox[i].battle_front_bitmap);
                         }
                         displayCount++;
                     }
@@ -428,7 +457,6 @@ int main() {
             }
             if (isKeyJustPressed(KEY_B)) { state = 75; stateChanged = true; }
         }
-        // --- V2.7: START MENU MET TYPE GUIDE ---
         else if (state == 7) { 
             if (stateChanged) { 
                 REG_DISPCNT = 0x0403; drawRectMain(0, 0, 240, 160, 0x2108); drawUIBoxMain(60, 10, 120, 140); 
@@ -446,13 +474,13 @@ int main() {
                 if (menuCursor == 0) { state = 71; } 
                 else if (menuCursor == 1) { state = 73; bagCursor = 0; } 
                 else if (menuCursor == 2) { state = 72; } 
-                else if (menuCursor == 3) { state = 78; } // Naar Guide
+                else if (menuCursor == 3) { state = 78; } 
                 else { state = 1; }
                 stateChanged = true; 
             }
             if (isKeyJustPressed(KEY_B)) { state = 1; stateChanged = true; }
         }
-        else if (state == 78) { // TYPE GUIDE SCHERM
+        else if (state == 78) { 
             if (stateChanged) {
                 drawRectMain(0, 0, 240, 160, 0x2108); drawUIBoxMain(10, 10, 220, 140);
                 drawText("--- TYPE EFFECTIVENESS ---", 30, 20, COLOR_GOLD);
@@ -517,7 +545,6 @@ int main() {
             if (stateChanged) { 
                 drawRectMain(0, 0, 240, 160, 0x2108); drawUIBoxMain(10, 10, 220, 140);
                 Karakter d; initKarakter(&d, dexCursor, 1); drawText(d.naam, 20, 30, COLOR_RED); 
-                if (d.battle_front_bitmap != NULL) { drawBitmapSprite(140, 55, 64, 64, d.battle_front_bitmap); }
                 stateChanged = false; 
             }
             if (isKeyJustPressed(KEY_RIGHT)) { dexCursor = (dexCursor+1)%11; stateChanged = true; }
@@ -525,7 +552,6 @@ int main() {
             if (isKeyJustPressed(KEY_B)) { state = 7; stateChanged = true; }
         }
 
-        // --- V2.7: MULTI-STEP NPC MISSIONS ---
         else if (state == 80) { 
             if (stateChanged) {
                 REG_DISPCNT = 0x0403; drawRectMain(0, 0, 240, 160, 0x2108);
@@ -544,14 +570,14 @@ int main() {
                 if (regio == 0 && side_quest_stage[0] == 0) {
                     if (dialoguePage < 2) { dialoguePage++; stateChanged = true; }
                     else {
-                        if (itemAantal[0] > 0) { // Item 0 = MEAT BONE
+                        if (itemAantal[0] > 0) {
                             itemAantal[0]--;
                             berries += 2500;
-                            itemAantal[2]++; // Senzu Bean beloning
+                            itemAantal[2]++;
                             side_quest_stage[0] = 1;
-                            state = 81; stateChanged = true; // Succes scherm
+                            state = 81; stateChanged = true;
                         } else {
-                            state = 82; stateChanged = true; // Faal scherm
+                            state = 82; stateChanged = true;
                         }
                     }
                 } else { state = 1; stateChanged = true; }
@@ -559,44 +585,29 @@ int main() {
             if (isKeyJustPressed(KEY_B)) { state = 1; stateChanged = true; }
         }
         else if (state == 81) {
-            if (stateChanged) {
-                drawRectMain(0, 0, 240, 160, 0x2108);
-                drawTextBox("QUEST COMPLETE!", "GOT 2500B & SENZU BEAN");
-                stateChanged = false;
-            }
+            if (stateChanged) { drawRectMain(0, 0, 240, 160, 0x2108); drawTextBox("QUEST COMPLETE!", "GOT 2500B & SENZU BEAN"); stateChanged = false; }
             if (isKeyJustPressed(KEY_A) || isKeyJustPressed(KEY_B)) { state = 1; stateChanged = true; }
         }
         else if (state == 82) {
-            if (stateChanged) {
-                drawRectMain(0, 0, 240, 160, 0x2108);
-                drawTextBox("YOU DON'T HAVE ANY", "MEAT BONES!");
-                stateChanged = false;
-            }
+            if (stateChanged) { drawRectMain(0, 0, 240, 160, 0x2108); drawTextBox("YOU DON'T HAVE ANY", "MEAT BONES!"); stateChanged = false; }
             if (isKeyJustPressed(KEY_A) || isKeyJustPressed(KEY_B)) { state = 1; stateChanged = true; }
         }
-        // -------------------------------------
 
         else if (state == 8) { 
             if (stateChanged) { 
                 REG_DISPCNT = 0x0403; drawRectMain(0, 0, 240, 160, 0x2108);
                 int stage = regio_stage[regio];
                 
-                if (regio == 0 && stage == 1) drawTradingCard(Zoro_cardBitmap);
-                if (regio == 1 && stage == 4) drawTradingCard(Shanks_cardBitmap);
-                if (regio == 2 && stage == 3) drawTradingCard(Mvegeta_cardBitmap);
-
                 if (regio == 0) {
                     if (stage == 1) {
                         if (dialoguePage == 0) drawTextBox("ZORO: HEY YOU!", "YOU LOOK STRONG.");
-                        else if (dialoguePage == 1) drawTextBox("ZORO: I NEED TO TEST", "MY NEW SWORDS.");
-                        else drawTextBox("ZORO: SHOW ME WHAT", "YOU CAN DO!");
+                        else drawTextBox("ZORO: I NEED TO TEST", "MY NEW SWORDS.");
                     } else if (stage == 2) drawTextBox("LUFFY: KAIDO IS MINE!", "LET'S SPAR FIRST!");
                     else if (stage == 3) drawTextBox("KAIDO: YOU BRATS WANT", "TO PLAY PIRATE? WORORO!");
                     else if (stage == 4) drawTextBox("SHANKS: I'M HERE TO", "TEST YOUR RESOLVE.");
                     else {
                         if (dialoguePage == 0) drawTextBox("KAIDO: YOU MADE IT", "THIS FAR...");
-                        else if (dialoguePage == 1) drawTextBox("KAIDO: BUT THIS IS", "WHERE YOU DIE.");
-                        else drawTextBox("KAIDO: I WILL SHOW", "YOU TRUE DESPAIR!");
+                        else drawTextBox("KAIDO: BUT THIS IS", "WHERE YOU DIE.");
                     }
                 } 
                 else if (regio == 1) { 
@@ -605,103 +616,50 @@ int main() {
                     else drawTextBox("MADARA: THIS BATTLEFIELD", "LACKS TRUE DESPAIR.");
                 } 
                 else if (regio == 2) { 
-                    if (stage == 1) {
-                        if (dialoguePage == 0) drawTextBox("GOKU: THIS IS BAD!", "BABIDI IS HERE.");
-                        else if (dialoguePage == 1) drawTextBox("GOKU: HE TAKES CONTROL", "OF EVIL HEARTS.");
-                        else if (dialoguePage == 2) drawTextBox("GOKU: VEGETA LET HIM", "IN PURPOSELY!");
-                        else drawTextBox("GOKU: WE HAVE TO", "STOP HIM NOW!");
-                    } else if (stage == 2) {
-                        if (dialoguePage == 0) drawTextBox("OBITO: WELCOME TO", "BABIDI'S SPACESHIP.");
-                        else if (dialoguePage == 1) drawTextBox("OBITO: YOU ARE TOO LATE.", "THE PRINCE IS OURS.");
-                        else if (dialoguePage == 2) drawTextBox("OBITO: HIS POWER IS", "FEEDING MAJIN BUU.");
-                        else drawTextBox("OBITO: YOU WILL NOT", "PASS THIS FLOOR!");
-                    } else if (stage == 3) {
-                        if (dialoguePage == 0) drawTextBox("VEGETA: I WANTED TO", "BE EVIL AGAIN!");
-                        else if (dialoguePage == 1) drawTextBox("VEGETA: PEACE AND FAMILY", "MADE ME WEAK.");
-                        else if (dialoguePage == 2) drawTextBox("VEGETA: BABIDI FREED", "MY TRUE SAIYAN PRIDE.");
-                        else drawTextBox("VEGETA: NOW DIE!", "GALICK GUN!");
-                    } else if (stage == 4) {
-                        if (dialoguePage == 0) drawTextBox("GOKU: VEGETA HAS LOST", "HIS MIND COMPLETELY.");
-                        else if (dialoguePage == 1) drawTextBox("GOKU: MAJIN BUU IS", "ABOUT TO HATCH!");
-                        else if (dialoguePage == 2) drawTextBox("GOKU: I NEED TO USE", "SUPER SAIYAN 3.");
-                        else drawTextBox("GOKU: BUT FIRST, SHOW", "ME YOUR STRENGTH!");
-                    } else {
+                    if (stage == 1) drawTextBox("GOKU: THIS IS BAD!", "BABIDI IS HERE.");
+                    else if (stage == 2) drawTextBox("OBITO: WELCOME TO", "BABIDI'S SPACESHIP.");
+                    else if (stage == 3) drawTextBox("VEGETA: I WANTED TO", "BE EVIL AGAIN!");
+                    else if (stage == 4) drawTextBox("GOKU: VEGETA HAS LOST", "HIS MIND COMPLETELY.");
+                    else {
                         if (dialoguePage == 0) drawTextBox("VEGETA: BUU IS AWAKE.", "IT'S MY FAULT.");
-                        else if (dialoguePage == 1) drawTextBox("VEGETA: I AM A PROUD", "SAIYAN PRINCE!");
-                        else if (dialoguePage == 2) drawTextBox("VEGETA: TRUNKS, BULMA...", "AND EVEN YOU, KAKAROT.");
-                        else drawTextBox("VEGETA: FAREWELL!", "FINAL EXPLOSION!");
+                        else drawTextBox("VEGETA: I AM A PROUD", "SAIYAN PRINCE!");
                     }
                 } 
                 else if (regio == 3) { 
-                    if (stage == 1) {
-                        if (dialoguePage == 0) drawTextBox("ITACHI: NARUTO... WHY", "SO OBSESSED WITH SASUKE?");
-                        else if (dialoguePage == 1) drawTextBox("NARUTO: BECAUSE HE IS", "MY FRIEND!");
-                        else if (dialoguePage == 2) drawTextBox("ITACHI: YOUR IDEALS", "ARE NAIVE. TURN BACK.");
-                        else drawTextBox("ITACHI: I WILL TEST", "YOUR RESOLVE NOW.");
-                    } else if (stage == 2) {
-                        if (dialoguePage == 0) drawTextBox("PAIN: THIS VILLAGE HAS", "ENJOYED PEACE TOO LONG.");
-                        else if (dialoguePage == 1) drawTextBox("NARUTO: WHO ARE YOU?!", "WHAT DID YOU DO?!");
-                        else if (dialoguePage == 2) drawTextBox("PAIN: I AM A GOD.", "I BRING ORDER.");
-                        else drawTextBox("PAIN: FEEL THE PAIN", "OF THE WORLD!");
-                    } else if (stage == 3) {
-                        if (dialoguePage == 0) drawTextBox("PAIN: DO YOU HATE ME", "NOW? GOOD.");
-                        else if (dialoguePage == 1) drawTextBox("PAIN: BUT YOUR JUSTICE", "IS LIKE MINE.");
-                        else if (dialoguePage == 2) drawTextBox("PAIN: WE ARE MEN DRIVEN", "BY PURE REVENGE.");
-                        else drawTextBox("NARUTO: I'LL BREAK THAT", "CYCLE! I WON'T GIVE UP!");
-                    } else if (stage == 4) {
-                        if (dialoguePage == 0) drawTextBox("OBITO: PAIN IS TAKING", "TOO LONG. I'LL STEP IN.");
-                        else if (dialoguePage == 1) drawTextBox("NARUTO: MADARA?! I", "THOUGHT YOU WERE DEAD!");
-                        else if (dialoguePage == 2) drawTextBox("OBITO: I AM NOBODY.", "NAMES HOLD NO MEANING.");
-                        else drawTextBox("OBITO: HAND OVER THE", "NINE-TAILS FOX!");
-                    } else {
-                        if (dialoguePage == 0) drawTextBox("PAIN: MY PAIN IS STILL", "FAR GREATER THAN YOURS!");
-                        else if (dialoguePage == 1) drawTextBox("NARUTO: I UNDERSTAND", "YOUR PAIN NOW...");
-                        else if (dialoguePage == 2) drawTextBox("NARUTO: BUT I CANNOT", "LET YOU WIN!");
-                        else drawTextBox("PAIN: ALMIGHTY PUSH!", "");
-                    }
+                    if (stage == 1) drawTextBox("ITACHI: NARUTO... WHY", "SO OBSESSED WITH SASUKE?");
+                    else if (stage == 2) drawTextBox("PAIN: THIS VILLAGE HAS", "ENJOYED PEACE TOO LONG.");
+                    else if (stage == 3) drawTextBox("PAIN: DO YOU HATE ME", "NOW? GOOD.");
+                    else if (stage == 4) drawTextBox("OBITO: PAIN IS TAKING", "TOO LONG. I'LL STEP IN.");
+                    else drawTextBox("PAIN: MY PAIN IS STILL", "FAR GREATER THAN YOURS!");
                 } 
                 else if (regio == 4) { 
-                    if (stage == 1) {
-                        if (dialoguePage == 0) drawTextBox("ITACHI: I AM EDO TENSEI.", "I CANNOT STOP MYSELF.");
-                        else if (dialoguePage == 1) drawTextBox("NARUTO: ITACHI! WE'LL", "FIND A WAY TO FREE YOU!");
-                        else if (dialoguePage == 2) drawTextBox("ITACHI: NO. YOU MUST", "DEFEAT ME TO ADVANCE.");
-                        else drawTextBox("ITACHI: PROTECT THE", "FUTURE OF THE SHINOBI!");
-                    } else if (stage == 2) {
-                        if (dialoguePage == 0) drawTextBox("OBITO: YOU BROKE MY", "MASK... SO WHAT.");
-                        else if (dialoguePage == 1) drawTextBox("NARUTO: OBITO! WHY", "ARE YOU DOING THIS?!");
-                        else if (dialoguePage == 2) drawTextBox("OBITO: LOOK AT THIS", "WORLD... ONLY SUFFERING.");
-                        else drawTextBox("OBITO: I WILL CREATE", "A PERFECT DREAM.");
-                    } else if (stage == 3) {
-                        if (dialoguePage == 0) drawTextBox("MADARA: SO, THE TIME", "HAS FINALLY COME.");
-                        else if (dialoguePage == 1) drawTextBox("NARUTO: THE REAL", "MADARA UCHIHA...");
-                        else if (dialoguePage == 2) drawTextBox("MADARA: YOU CHILDREN", "WANT TO DANCE?");
-                        else drawTextBox("MADARA: LET'S SEE HOW", "YOU HANDLE A METEOR!");
-                    } else if (stage == 4) {
-                        if (dialoguePage == 0) drawTextBox("OBITO: I HAVE ABSORBED", "THE TEN-TAILS.");
-                        else if (dialoguePage == 1) drawTextBox("NARUTO: WE WON'T LET", "YOU ERASE OUR WORLD!");
-                        else if (dialoguePage == 2) drawTextBox("OBITO: IT IS FUTILE.", "MY POWER IS ABSOLUTE.");
-                        else drawTextBox("OBITO: SLEEP IN THE", "INFINITE TSUKUYOMI.");
-                    } else {
+                    if (stage == 1) drawTextBox("ITACHI: I AM EDO TENSEI.", "I CANNOT STOP MYSELF.");
+                    else if (stage == 2) drawTextBox("OBITO: YOU BROKE MY", "MASK... SO WHAT.");
+                    else if (stage == 3) drawTextBox("MADARA: SO, THE TIME", "HAS FINALLY COME.");
+                    else if (stage == 4) drawTextBox("OBITO: I HAVE ABSORBED", "THE TEN-TAILS.");
+                    else {
                         if (dialoguePage == 0) drawTextBox("MADARA: YOU FOUGHT WELL", "BUT IT IS OVER.");
-                        else if (dialoguePage == 1) drawTextBox("MADARA: THE MOON IS RED.", "THE ILLUSION IS CAST.");
-                        else if (dialoguePage == 2) drawTextBox("NARUTO: I WON'T GIVE", "UP! EVERYONE TRUSTS ME!");
-                        else drawTextBox("MADARA: WAKE UP TO", "REALITY! DIE IN DESPAIR!");
+                        else drawTextBox("MADARA: WAKE UP TO", "REALITY!");
                     }
                 }
                 stateChanged = false; 
             }
             if (isKeyJustPressed(KEY_A)) { 
                 int maxPages = 0;
-                if (regio == 2 || regio == 3 || regio == 4) { maxPages = 3; } 
-                else if (regio == 0 && (regio_stage[regio] == 1 || regio_stage[regio] == 5)) { maxPages = 2; }
+                if ((regio == 0 && (regio_stage[regio] == 1 || regio_stage[regio] == 5)) || 
+                    (regio == 2 && regio_stage[regio] == 5) ||
+                    (regio == 4 && regio_stage[regio] == 5)) {
+                    maxPages = 1; 
+                }
                 
                 if (dialoguePage < maxPages) { dialoguePage++; stateChanged = true; } 
                 else { 
-                    if (regio == 4 && regio_stage[regio] == 5) {
-                        state = 100; stateChanged = true; 
-                    } else {
-                        state = 2; startBattle(true); stateChanged = true; 
-                    }
+                    // TRIGGER CUTSCENES
+                    if (regio == 0 && regio_stage[regio] == 1) { active_cutscene = 0; state = 100; stateChanged = true; }
+                    else if (regio == 0 && regio_stage[regio] == 5) { active_cutscene = 1; state = 100; stateChanged = true; }
+                    else if (regio == 2 && regio_stage[regio] == 5) { active_cutscene = 2; state = 100; stateChanged = true; }
+                    else if (regio == 4 && regio_stage[regio] == 5) { active_cutscene = 3; state = 100; stateChanged = true; }
+                    else { state = 2; startBattle(true); stateChanged = true; }
                 }
             }
         }
@@ -714,23 +672,15 @@ int main() {
             if (isKeyJustPressed(KEY_A)) { state = 1; stateChanged = true; }
         }
         else if (state == 90) { 
-            if (stateChanged) {
-                REG_DISPCNT = 0x0403; drawRectMain(0, 0, 240, 160, COLOR_WHITE); animTimer = 120; stateChanged = false;
-            }
+            if (stateChanged) { REG_DISPCNT = 0x0403; drawRectMain(0, 0, 240, 160, COLOR_WHITE); animTimer = 120; stateChanged = false; }
             animTimer--;
             if (animTimer == 100) {
                 drawRectMain(0, 0, 240, 160, COLOR_BLACK); 
-                if (team[activeIdx].char_id == 0 && team[activeIdx].status == 3) { drawTradingCard(LuffyG5_cardBitmap); }
-                drawUIBoxMain(10, 110, 220, 45);
-                drawText("WHAT? YOUR HERO", 20, 120, COLOR_WHITE); 
-                drawText("IS EVOLVING!", 20, 135, COLOR_GOLD);
+                drawUIBoxMain(10, 110, 220, 45); drawText("WHAT? YOUR HERO", 20, 120, COLOR_WHITE); drawText("IS EVOLVING!", 20, 135, COLOR_GOLD);
             }
             if (animTimer == 40) {
                 drawRectMain(0, 0, 240, 160, COLOR_BLACK); 
-                if (team[activeIdx].char_id == 0 && team[activeIdx].status == 3) { drawTradingCard(LuffyG5_cardBitmap); }
-                drawUIBoxMain(10, 110, 220, 45);
-                drawText("CONGRATULATIONS!", 20, 120, COLOR_GREEN); 
-                drawText(team[activeIdx].naam, 20, 135, COLOR_WHITE);
+                drawUIBoxMain(10, 110, 220, 45); drawText("CONGRATULATIONS!", 20, 120, COLOR_GREEN); drawText(team[activeIdx].naam, 20, 135, COLOR_WHITE);
             }
             if (animTimer <= 0 && isKeyJustPressed(KEY_A)) { state = 1; stateChanged = true; initOAM(); }
         }
@@ -740,22 +690,14 @@ int main() {
                 drawText("CONGRATULATIONS!", 60, 40, COLOR_GOLD); drawText("YOU SAVED THE ANIME WORLD!", 25, 70, COLOR_WHITE);
                 drawText("PRESS START TO CONTINUE", 35, 110, COLOR_RED); stateChanged = false;
             }
-            if (isKeyJustPressed(KEY_START)) { 
-                gameCleared = true; 
-                state = 1; stateChanged = true; initOAM();
-            }
+            if (isKeyJustPressed(KEY_START)) { gameCleared = true; state = 1; stateChanged = true; initOAM(); }
         }
         else if (state == 2) { 
             if (stateChanged) { REG_DISPCNT = 0x0403; stateChanged = false; }
             if (updateBattle()) { 
                 if (regio == 5) {
-                    if (vijand_team[0].hp <= 0) {
-                        colosseumWave++;
-                        berries += 1000 * colosseumWave;
-                        state = 110; stateChanged = true; initOAM();
-                    } else {
-                        state = 112; stateChanged = true; initOAM();
-                    }
+                    if (vijand_team[0].hp <= 0) { colosseumWave++; berries += 1000 * colosseumWave; state = 110; stateChanged = true; initOAM(); } 
+                    else { state = 112; stateChanged = true; initOAM(); }
                     continue; 
                 }
 
