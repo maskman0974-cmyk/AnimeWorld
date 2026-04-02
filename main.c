@@ -25,13 +25,7 @@
 #define REG_BG0VOFS  *(volatile uint16_t*)0x04000012 
 #define REG_KEYINPUT *(volatile uint16_t*)0x04000130
 
-#define KEY_A      (1<<0)
-#define KEY_B      (1<<1)
-#define KEY_START  (1<<3)
-#define KEY_RIGHT  (1<<4)
-#define KEY_LEFT   (1<<5)
-#define KEY_UP     (1<<6)
-#define KEY_DOWN   (1<<7)
+
 
 #define COLOR_BLACK 0x0000
 #define COLOR_GOLD  0x03FF
@@ -53,11 +47,12 @@ extern int getEmptyPartySlot(void);
 extern int getEmptyPcSlot(void);
 
 // --- V2.6 TRADING CARD RENDER FUNCTIE ---
-void drawTradingCard(const uint16_t* bitmap) {
+void drawTradingCard(const void* bitmapData) {
+    const uint16_t* bitmap = (const uint16_t*)bitmapData; 
     volatile uint16_t* vram = (volatile uint16_t*)0x06000000;
+    
     for(int y = 0; y < 80; y++) {
         for(int x = 0; x < 64; x++) {
-            // Centreer: X=88. Y=10 (zodat hij mooi boven de dialoogbox staat)
             vram[(y + 10) * 240 + (x + 88)] = bitmap[y * 64 + x];
         }
     }
