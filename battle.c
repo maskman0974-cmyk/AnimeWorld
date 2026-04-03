@@ -92,7 +92,6 @@ bool eVis = true;
 int typeModifierText = 0; 
 bool passiveTriggered = false;
 
-// MOVE LEARNER GLOBALS
 int learningCharIdx = 0;
 int learningMoveIdx = 0;
 int moveReplaceCursor = 0;
@@ -148,31 +147,34 @@ void drawBar(int x, int y, int w, int h, int val, int max, uint16_t color) {
     drawRect(x, y, fill, h, color);
 }
 
+// V3.0 FIX: Compacte UI in de uithoeken, 0% overlap met sprites!
 void drawBattleUI() {
-    drawUIBox(4, 4, 120, 40); 
+    // Enemy UI (Boven Links)
+    drawUIBox(4, 4, 110, 32); 
     drawText(vijand_team[activeEnemyIdx].naam, 8, 8, COLOR_WHITE);
     int eType = getBaseType(vijand_team[activeEnemyIdx].char_id);
-    drawText(typeAfk[eType], 8, 18, getTypeColor(eType));
-    drawText("LVL", 85, 8, COLOR_GOLD); 
-    drawNumber(vijand_team[activeEnemyIdx].lvl, 105, 8, COLOR_GOLD);
+    drawText(typeAfk[eType], 80, 8, getTypeColor(eType));
+    drawText("L", 98, 8, COLOR_GOLD); 
+    drawNumber(vijand_team[activeEnemyIdx].lvl, 104, 8, COLOR_GOLD);
     
     uint16_t vColor = BAR_GREEN;
     if (vijand_team[activeEnemyIdx].hp < vijand_team[activeEnemyIdx].max_hp / 2) vColor = BAR_YELLOW;
     if (vijand_team[activeEnemyIdx].hp < vijand_team[activeEnemyIdx].max_hp / 5) vColor = BAR_RED;
-    drawBar(10, 30, 100, 5, vijand_team[activeEnemyIdx].hp, vijand_team[activeEnemyIdx].max_hp, vColor);
+    drawBar(8, 22, 102, 6, vijand_team[activeEnemyIdx].hp, vijand_team[activeEnemyIdx].max_hp, vColor);
     
-    drawUIBox(116, 64, 120, 50); 
-    drawText(team[activeIdx].naam, 120, 68, COLOR_WHITE);
+    // Player UI (Onder Rechts)
+    drawUIBox(124, 76, 112, 32); 
+    drawText(team[activeIdx].naam, 128, 80, COLOR_WHITE);
     int pType = getBaseType(team[activeIdx].char_id);
-    drawText(typeAfk[pType], 120, 78, getTypeColor(pType));
-    drawText("LVL", 195, 68, COLOR_GOLD); 
-    drawNumber(team[activeIdx].lvl, 215, 68, COLOR_GOLD);
+    drawText(typeAfk[pType], 194, 80, getTypeColor(pType));
+    drawText("L", 216, 80, COLOR_GOLD); 
+    drawNumber(team[activeIdx].lvl, 222, 80, COLOR_GOLD);
     
     uint16_t pColor = BAR_GREEN;
     if (team[activeIdx].hp < team[activeIdx].max_hp / 2) pColor = BAR_YELLOW;
     if (team[activeIdx].hp < team[activeIdx].max_hp / 5) pColor = BAR_RED;
-    drawBar(120, 92, 105, 5, team[activeIdx].hp, team[activeIdx].max_hp, pColor);
-    drawBar(120, 102, 105, 2, team[activeIdx].xp, team[activeIdx].xp_nodig, BAR_BLUE);
+    drawBar(128, 94, 104, 6, team[activeIdx].hp, team[activeIdx].max_hp, pColor);
+    drawBar(128, 102, 104, 2, team[activeIdx].xp, team[activeIdx].xp_nodig, BAR_BLUE);
 }
 
 void drawVFX() {
@@ -192,19 +194,20 @@ void drawVFX() {
     }
 }
 
-void restoreBG(int x, int y, int w, int h) {
-    for(int r = 0; r < h; r++) {
-        for(int c = 0; c < w; c++) {
-            if (x + c >= 0 && x + c < 240 && y + r >= 0 && y + r < 160) {
-                drawPixel(x + c, y + r, battle_bgBitmap[(y + r) * 240 + (x + c)]);
-            }
-        }
-    }
-}
-
+// V3.0 FIX: Veel slimmere achtergrond-update die UI negeert en cast-fout voorkomt
 void updateAttackAnim() {
     waitVBlank();
-    restoreBG(0, 0, 240, 114);
+    // Forceer pointer naar 16-bit om lees-fouten (garbage lines) te voorkomen
+    const uint16_t* bg = (const uint16_t*)battle_bgBitmap;
+    
+    // Wis exact de linkerzone (Player & VFX) zonder de Player UI te raken
+    for(int r = 40; r < 108; r++) {
+        for(int c = 0; c < 120; c++) drawPixel(c, r, bg[r * 240 + c]);
+    }
+    // Wis exact de rechterzone (Enemy & VFX) zonder de Enemy UI te raken
+    for(int r = 8; r < 74; r++) {
+        for(int c = 120; c < 240; c++) drawPixel(c, r, bg[r * 240 + c]);
+    }
 
     if (pVis) {
         if (team[activeIdx].char_id == 0 && team[activeIdx].status == 3) {
@@ -215,17 +218,14 @@ void updateAttackAnim() {
                 }
             }
         } else {
-            drawBitmapSprite(24 + pOffX, 56, 64, 64, team[activeIdx].battle_back_bitmap);
+            drawBitmapSprite(24 + pOffX, 40, 64, 64, team[activeIdx].battle_back_bitmap);
         }
     }
 
-    if (eVis) drawBitmapSprite(150 + eOffX, 16, 64, 64, vijand_team[activeEnemyIdx].battle_front_bitmap);
+    if (eVis) drawBitmapSprite(150 + eOffX, 8, 64, 64, vijand_team[activeEnemyIdx].battle_front_bitmap);
 
     drawVFX();
-    
-    if (bState != 10 && bState != 12 && bState != 14) {
-        drawBattleUI();
-    }
+    // GEEN UI DRAW HIER! Daardoor 0% flicker.
 }
 
 void redrawBattleScene() {
@@ -234,6 +234,10 @@ void redrawBattleScene() {
     *(volatile uint32_t*)0x040000D8 = (uint32_t)0x06000000;
     *(volatile uint32_t*)0x040000DC = 0x80000000 | 0x04000000 | 19200; 
 
+    if (bState != 10 && bState != 12 && bState != 14 && bState != 52) {
+        drawBattleUI();
+    }
+
     if (pVis) {
         if (team[activeIdx].char_id == 0 && team[activeIdx].status == 3) {
             const uint16_t* g5_kaart = (const uint16_t*)LuffyG5_cardBitmap;
@@ -243,15 +247,11 @@ void redrawBattleScene() {
                 }
             }
         } else {
-            drawBitmapSprite(24 + pOffX, 56, 64, 64, team[activeIdx].battle_back_bitmap);
+            drawBitmapSprite(24 + pOffX, 40, 64, 64, team[activeIdx].battle_back_bitmap);
         }
     }
 
-    if (eVis) drawBitmapSprite(150 + eOffX, 16, 64, 64, vijand_team[activeEnemyIdx].battle_front_bitmap);
-
-    if (bState != 10 && bState != 12 && bState != 14 && bState != 52) {
-        drawBattleUI();
-    }
+    if (eVis) drawBitmapSprite(150 + eOffX, 8, 64, 64, vijand_team[activeEnemyIdx].battle_front_bitmap);
 }
 
 int calculateDamage(Karakter* attacker, Karakter* defender, Move* m) {
@@ -477,7 +477,7 @@ bool updateBattle() {
                 dynamic_old_vijand_hp--; 
                 dynamic_anim_timer = 0;
                 
-                int x = 10, y = 30, w = 100, h = 5;
+                int x = 8, y = 22, w = 102, h = 6;
                 int max_hp = vijand_team[activeEnemyIdx].max_hp;
                 int hp = dynamic_old_vijand_hp;
                 
@@ -640,7 +640,7 @@ bool updateBattle() {
                 dynamic_old_active_hp--; 
                 dynamic_anim_timer = 0;
                 
-                int x = 120, y = 92, w = 105, h = 5; 
+                int x = 128, y = 94, w = 104, h = 6; 
                 int max_hp = team[activeIdx].max_hp;
                 int hp = dynamic_old_active_hp;
                 
@@ -702,7 +702,7 @@ bool updateBattle() {
             dynamic_anim_timer += 2; 
             if (dynamic_anim_timer > target_xp) dynamic_anim_timer = target_xp;
             
-            drawBar(120, 102, 105, 2, dynamic_anim_timer, team[activeIdx].xp_nodig, BAR_BLUE);
+            drawBar(128, 102, 104, 2, dynamic_anim_timer, team[activeIdx].xp_nodig, BAR_BLUE);
             
         } else {
             return true; 
