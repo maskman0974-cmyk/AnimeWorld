@@ -147,34 +147,33 @@ void drawBar(int x, int y, int w, int h, int val, int max, uint16_t color) {
     drawRect(x, y, fill, h, color);
 }
 
-// V3.0 FIX: Compacte UI in de uithoeken, 0% overlap met sprites!
 void drawBattleUI() {
-    // Enemy UI (Boven Links)
-    drawUIBox(4, 4, 110, 32); 
-    drawText(vijand_team[activeEnemyIdx].naam, 8, 8, COLOR_WHITE);
+    // Enemy UI (Boven Links) - Ruimere layout!
+    drawUIBox(4, 4, 124, 44); 
+    drawText(vijand_team[activeEnemyIdx].naam, 10, 10, COLOR_WHITE);
     int eType = getBaseType(vijand_team[activeEnemyIdx].char_id);
-    drawText(typeAfk[eType], 80, 8, getTypeColor(eType));
-    drawText("L", 98, 8, COLOR_GOLD); 
-    drawNumber(vijand_team[activeEnemyIdx].lvl, 104, 8, COLOR_GOLD);
+    drawText(typeAfk[eType], 10, 22, getTypeColor(eType));
+    drawText("LVL", 80, 10, COLOR_GOLD); 
+    drawNumber(vijand_team[activeEnemyIdx].lvl, 105, 10, COLOR_GOLD);
     
     uint16_t vColor = BAR_GREEN;
     if (vijand_team[activeEnemyIdx].hp < vijand_team[activeEnemyIdx].max_hp / 2) vColor = BAR_YELLOW;
     if (vijand_team[activeEnemyIdx].hp < vijand_team[activeEnemyIdx].max_hp / 5) vColor = BAR_RED;
-    drawBar(8, 22, 102, 6, vijand_team[activeEnemyIdx].hp, vijand_team[activeEnemyIdx].max_hp, vColor);
+    drawBar(10, 36, 112, 6, vijand_team[activeEnemyIdx].hp, vijand_team[activeEnemyIdx].max_hp, vColor);
     
-    // Player UI (Onder Rechts)
-    drawUIBox(124, 76, 112, 32); 
-    drawText(team[activeIdx].naam, 128, 80, COLOR_WHITE);
+    // Player UI (Onder Rechts) - Ruimere layout!
+    drawUIBox(112, 66, 124, 44); 
+    drawText(team[activeIdx].naam, 118, 72, COLOR_WHITE);
     int pType = getBaseType(team[activeIdx].char_id);
-    drawText(typeAfk[pType], 194, 80, getTypeColor(pType));
-    drawText("L", 216, 80, COLOR_GOLD); 
-    drawNumber(team[activeIdx].lvl, 222, 80, COLOR_GOLD);
+    drawText(typeAfk[pType], 118, 84, getTypeColor(pType));
+    drawText("LVL", 188, 72, COLOR_GOLD); 
+    drawNumber(team[activeIdx].lvl, 213, 72, COLOR_GOLD);
     
     uint16_t pColor = BAR_GREEN;
     if (team[activeIdx].hp < team[activeIdx].max_hp / 2) pColor = BAR_YELLOW;
     if (team[activeIdx].hp < team[activeIdx].max_hp / 5) pColor = BAR_RED;
-    drawBar(128, 94, 104, 6, team[activeIdx].hp, team[activeIdx].max_hp, pColor);
-    drawBar(128, 102, 104, 2, team[activeIdx].xp, team[activeIdx].xp_nodig, BAR_BLUE);
+    drawBar(118, 98, 112, 6, team[activeIdx].hp, team[activeIdx].max_hp, pColor);
+    drawBar(118, 106, 112, 2, team[activeIdx].xp, team[activeIdx].xp_nodig, BAR_BLUE);
 }
 
 void drawVFX() {
@@ -194,19 +193,19 @@ void drawVFX() {
     }
 }
 
-// V3.0 FIX: Veel slimmere achtergrond-update die UI negeert en cast-fout voorkomt
 void updateAttackAnim() {
     waitVBlank();
-    // Forceer pointer naar 16-bit om lees-fouten (garbage lines) te voorkomen
     const uint16_t* bg = (const uint16_t*)battle_bgBitmap;
     
-    // Wis exact de linkerzone (Player & VFX) zonder de Player UI te raken
-    for(int r = 40; r < 108; r++) {
-        for(int c = 0; c < 120; c++) drawPixel(c, r, bg[r * 240 + c]);
-    }
-    // Wis exact de rechterzone (Enemy & VFX) zonder de Enemy UI te raken
-    for(int r = 8; r < 74; r++) {
-        for(int c = 120; c < 240; c++) drawPixel(c, r, bg[r * 240 + c]);
+    for(int r = 0; r < 112; r++) { 
+        for(int c = 0; c < 240; c++) {
+            // Sla de bounds van de Enemy UI over (4,4 tot 128,48)
+            if (c >= 4 && c <= 128 && r >= 4 && r <= 48) continue;
+            // Sla de bounds van de Player UI over (112,66 tot 236,110)
+            if (c >= 112 && c <= 236 && r >= 66 && r <= 110) continue;
+            
+            drawPixel(c, r, bg[r * 240 + c]);
+        }
     }
 
     if (pVis) {
@@ -225,7 +224,6 @@ void updateAttackAnim() {
     if (eVis) drawBitmapSprite(150 + eOffX, 8, 64, 64, vijand_team[activeEnemyIdx].battle_front_bitmap);
 
     drawVFX();
-    // GEEN UI DRAW HIER! Daardoor 0% flicker.
 }
 
 void redrawBattleScene() {
@@ -477,7 +475,7 @@ bool updateBattle() {
                 dynamic_old_vijand_hp--; 
                 dynamic_anim_timer = 0;
                 
-                int x = 8, y = 22, w = 102, h = 6;
+                int x = 10, y = 36, w = 112, h = 6;
                 int max_hp = vijand_team[activeEnemyIdx].max_hp;
                 int hp = dynamic_old_vijand_hp;
                 
@@ -640,7 +638,7 @@ bool updateBattle() {
                 dynamic_old_active_hp--; 
                 dynamic_anim_timer = 0;
                 
-                int x = 128, y = 94, w = 104, h = 6; 
+                int x = 118, y = 98, w = 112, h = 6; 
                 int max_hp = team[activeIdx].max_hp;
                 int hp = dynamic_old_active_hp;
                 
@@ -702,7 +700,7 @@ bool updateBattle() {
             dynamic_anim_timer += 2; 
             if (dynamic_anim_timer > target_xp) dynamic_anim_timer = target_xp;
             
-            drawBar(128, 102, 104, 2, dynamic_anim_timer, team[activeIdx].xp_nodig, BAR_BLUE);
+            drawBar(118, 106, 112, 2, dynamic_anim_timer, team[activeIdx].xp_nodig, BAR_BLUE);
             
         } else {
             return true; 
