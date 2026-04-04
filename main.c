@@ -11,7 +11,6 @@
 #include "shibuya.h"
 #include "luffy.h" 
 
-// --- NIEUWE MAPS & CUTSCENES ---
 #include "wano_bamboo.h"
 #include "marineford_ice.h"
 #include "konoha_river.h"
@@ -19,7 +18,6 @@
 #include "Vegeta_cutscene.h"
 #include "Kaido_cutscene.h"
 #include "Zoro_cutscene.h"
-// -------------------------------
 
 #include "LuffyG5_card.h"
 #include "Zoro_card.h"
@@ -52,19 +50,6 @@ extern void drawBitmapSprite(int x, int y, int width, int height, const uint16_t
 extern int getEmptyPartySlot(void);
 extern int getEmptyPcSlot(void);
 extern void initGraphicsMode3(void); 
-
-// --- NIEUW: Padded Map Loader voor Mode 0 ---
-void loadMap240x160(const void* src, volatile uint16_t* dest, int numTiles, int tilesPerRow) {
-    const uint16_t* src16 = (const uint16_t*)src;
-    int numRows = numTiles / tilesPerRow;
-    for(int r = 0; r < numRows; r++) {
-        for(int c = 0; c < tilesPerRow; c++) {
-            dest[r * 32 + c] = src16[r * tilesPerRow + c];
-        }
-        // Pad met lege tiles aan het einde van elke 256px rij (32 tiles breed)
-        for(int c = tilesPerRow; c < 32; c++) { dest[r * 32 + c] = 0; }
-    }
-}
 
 void drawRectMain(int x, int y, int w, int h, uint16_t color) {
     volatile uint16_t* vram = (volatile uint16_t*)0x06000000;
@@ -102,7 +87,7 @@ bool hasMasterNet = false;
 int colosseumWave = 1;
 int prevRegio = 0;
 int active_cutscene = 0; 
-char l1[32]; // buffer voor dynamische eerste regel dialogue
+char l1[32]; 
 
 void updateInput() { 
     previous_keys = current_keys; 
@@ -129,47 +114,47 @@ int side_quest_stage[6] = {0, 0, 0, 0, 0, 0};
 int interactie_npc = 0; 
 int dialoguePage = 0; 
 
-// --- DYNAMISCHE MAP LOADER ---
+// V3.3 FIX: Pure Map Copy omdat je maps perfect 256x256 zijn!
 void loadMap() {
     REG_BG0CNT = 0x1F00; 
     if (regio == 0) {
         if (regio_stage[0] >= 3) {
             copy16(wano_bambooPal, (volatile uint16_t*)0x05000000, wano_bambooPalLen);
             copy16(wano_bambooTiles, (volatile uint16_t*)0x06000000, wano_bambooTilesLen);
-            loadMap240x160(wano_bambooMap, (volatile uint16_t*)0x0600F800, 30*20, 30); // 30x20 tiles = 240x160
+            copy16(wano_bambooMap, (volatile uint16_t*)0x0600F800, wano_bambooMapLen); 
         } else {
             copy16(bgPal, (volatile uint16_t*)0x05000000, bgPalLen);
             copy16(bgTiles, (volatile uint16_t*)0x06000000, bgTilesLen);
-            loadMap240x160(bgMap, (volatile uint16_t*)0x0600F800, 30*20, 30);
+            copy16(bgMap, (volatile uint16_t*)0x0600F800, bgMapLen);
         }
     } else if (regio == 1) {
         if (regio_stage[1] >= 3) {
             copy16(marineford_icePal, (volatile uint16_t*)0x05000000, marineford_icePalLen);
             copy16(marineford_iceTiles, (volatile uint16_t*)0x06000000, marineford_iceTilesLen);
-            loadMap240x160(marineford_iceMap, (volatile uint16_t*)0x0600F800, 30*20, 30);
+            copy16(marineford_iceMap, (volatile uint16_t*)0x0600F800, marineford_iceMapLen);
         } else {
             copy16(marinefordPal, (volatile uint16_t*)0x05000000, marinefordPalLen);
             copy16(marinefordTiles, (volatile uint16_t*)0x06000000, marinefordTilesLen);
-            loadMap240x160(marinefordMap, (volatile uint16_t*)0x0600F800, 30*20, 30);
+            copy16(marinefordMap, (volatile uint16_t*)0x0600F800, marinefordMapLen);
         }
     } else if (regio == 2) {
         copy16(alabastaPal, (volatile uint16_t*)0x05000000, alabastaPalLen);
         copy16(alabastaTiles, (volatile uint16_t*)0x06000000, alabastaTilesLen);
-        loadMap240x160(alabastaMap, (volatile uint16_t*)0x0600F800, 30*20, 30);
+        copy16(alabastaMap, (volatile uint16_t*)0x0600F800, alabastaMapLen);
     } else if (regio == 3) {
         if (regio_stage[3] >= 3) {
             copy16(konoha_riverPal, (volatile uint16_t*)0x05000000, konoha_riverPalLen);
             copy16(konoha_riverTiles, (volatile uint16_t*)0x06000000, konoha_riverTilesLen);
-            loadMap240x160(konoha_riverMap, (volatile uint16_t*)0x0600F800, 30*20, 30);
+            copy16(konoha_riverMap, (volatile uint16_t*)0x0600F800, konoha_riverMapLen);
         } else {
             copy16(konohaPal, (volatile uint16_t*)0x05000000, konohaPalLen);
             copy16(konohaTiles, (volatile uint16_t*)0x06000000, konohaTilesLen);
-            loadMap240x160(konohaMap, (volatile uint16_t*)0x0600F800, 30*20, 30);
+            copy16(konohaMap, (volatile uint16_t*)0x0600F800, konohaMapLen);
         }
     } else if (regio == 4) {
         copy16(shibuyaPal, (volatile uint16_t*)0x05000000, shibuyaPalLen);
         copy16(shibuyaTiles, (volatile uint16_t*)0x06000000, shibuyaTilesLen);
-        loadMap240x160(shibuyaMap, (volatile uint16_t*)0x0600F800, 30*20, 30);
+        copy16(shibuyaMap, (volatile uint16_t*)0x0600F800, shibuyaMapLen);
     }
     copy16(luffyPal, (volatile uint16_t*)0x05000200, luffyPalLen);
     copy16(luffyTiles, (volatile uint16_t*)0x06010000, luffyTilesLen);
@@ -179,7 +164,7 @@ int main() {
     initSound(); 
     initTeam(); 
     initOAM();
-    initGraphicsMode3(); // Init graphics before mainGameLoop
+    initGraphicsMode3(); 
 
     while(1) {
         waitVBlank(); 
@@ -191,7 +176,7 @@ int main() {
                 drawRectMain(0, 0, 240, 160, 0x1084); 
                 drawUIBoxMain(40, 30, 160, 80);
                 drawText("ANIME WORLD", 80, 50, COLOR_GOLD); 
-                drawText("V3.1 SEAMLESS", 65, 70, COLOR_WHITE); 
+                drawText("V3.3 SEAMLESS", 65, 70, COLOR_WHITE); 
                 drawText("PRESS START", 80, 130, COLOR_WHITE); 
                 stateChanged = false;
             }
@@ -276,14 +261,34 @@ int main() {
                         state = 102; stateChanged = true; 
                     } else {
                         int stage = regio_stage[regio];
-                        // Add colon after NPC's name and set active cutscene
-                        if (regio == 0)      { if(stage==1) sprintf(l1, "ZORO:"); if(stage==5) sprintf(l1, "KAIDO:"); active_cutscene=1; } // Kaido is 1
-                        else if (regio == 1) { if(stage==1) sprintf(l1, "ZORO:"); if(stage==5) sprintf(l1, "MADARA:"); active_cutscene=3; } // Madara is 3
-                        else if (regio == 2) { if(stage==1) sprintf(l1, "GOKU:"); if(stage==5) sprintf(l1, "VEGETA:"); active_cutscene=2; } // Vegeta is 2
-                        // ... for other bosses ...
+                        bool hasCutscene = false;
                         
-                        // Go to cutscene state directly
-                        state = 100; stateChanged = true; dialoguePage = 0; 
+                        if (regio == 0 && stage == 1) { active_cutscene = 0; hasCutscene = true; }
+                        else if (regio == 0 && stage == 5) { active_cutscene = 1; hasCutscene = true; }
+                        else if (regio == 2 && stage == 5) { active_cutscene = 2; hasCutscene = true; }
+                        else if (regio == 4 && stage == 5) { active_cutscene = 3; hasCutscene = true; }
+                        
+                        if (hasCutscene) {
+                            state = 100; stateChanged = true; dialoguePage = 0; 
+                        } else {
+                            if (regio == 0) {
+                                if (stage == 1) interactie_npc = 1; else if (stage == 2) interactie_npc = 0; 
+                                else if (stage == 3) interactie_npc = 2; else if (stage == 4) interactie_npc = 6; else interactie_npc = 2;
+                            } else if (regio == 1) { 
+                                if (stage == 1) interactie_npc = 1; else if (stage == 2) interactie_npc = 4; 
+                                else if (stage == 3) interactie_npc = 9; else if (stage == 4) interactie_npc = 6; else interactie_npc = 7;
+                            } else if (regio == 2) { 
+                                if (stage == 1) interactie_npc = 3; else if (stage == 2) interactie_npc = 8; 
+                                else if (stage == 3) interactie_npc = 5; else if (stage == 4) interactie_npc = 3; else interactie_npc = 5;
+                            } else if (regio == 3) { 
+                                if (stage == 1) interactie_npc = 10; else if (stage == 2) interactie_npc = 9; 
+                                else if (stage == 3) interactie_npc = 9; else if (stage == 4) interactie_npc = 8; else interactie_npc = 9;
+                            } else if (regio == 4) { 
+                                if (stage == 1) interactie_npc = 10; else if (stage == 2) interactie_npc = 8; 
+                                else if (stage == 3) interactie_npc = 7; else if (stage == 4) interactie_npc = 8; else interactie_npc = 7;
+                            }
+                            state = 8; stateChanged = true; dialoguePage = 0;
+                        }
                     }
                 }
             }
@@ -291,7 +296,6 @@ int main() {
         else if (state == 101) { 
             if (stateChanged) {
                 REG_DISPCNT = 0x0403; drawRectMain(0, 0, 240, 160, 0x2108);
-                // Add colon after name
                 if (regio == 0) drawTextBox("VILLAGER:", "YOU FOUND 10 SECRET CAPTURE NETS!");
                 if (regio == 2) drawTextBox("VILLAGER:", "YOU FOUND THE 4-STAR DRAGON BALL!");
                 stateChanged = false;
@@ -306,64 +310,60 @@ int main() {
             }
             if (isKeyJustPressed(KEY_A)) { state = 1; stateChanged = true; }
         }
-        // --- NIEUW: FULL SCREEN PORTRAIT DIALOGUE LOADER ---
+        // V3.3 FIX: Cutscenes laden voor de HELE conversatie
         else if (state == 100) { 
             if (stateChanged) {
                 REG_DISPCNT = 0x0403; 
                 const uint16_t* img = NULL;
-                char l2[32]; // buffer for dynamic second line
+                char l2[32]; 
                 
-                // Use switch for clarity
-                switch(active_cutscene) {
-                    case 1: // Kaido conversation
-                        img = (const uint16_t*)Kaido_cutsceneBitmap;
-                        if(dialoguePage==0) { sprintf(l1, "KAIDO:"); sprintf(l2, "WORORO! YOU BRATS"); }
-                        if(dialoguePage==1) { sprintf(l1, "KAIDO:"); sprintf(l2, "CANNOT DEFEAT ME!"); }
-                        if(dialoguePage==2) { sprintf(l1, "KAIDO:"); sprintf(l2, "I AM A PIRATE YONKO!"); }
-                        break;
-                    case 2: // Vegeta conversation
-                        img = (const uint16_t*)Vegeta_cutsceneBitmap;
-                        if(dialoguePage==0) { sprintf(l1, "VEGETA:"); sprintf(l2, "FAREWELL, BULMA... TRUNKS..."); }
-                        if(dialoguePage==1) { sprintf(l1, "VEGETA:"); sprintf(l2, "I WANTED TO BE EVIL AGAIN!"); }
-                        if(dialoguePage==2) { sprintf(l1, "VEGETA:"); sprintf(l2, "I AM A PROUD SAIYAN PRINCE!"); }
-                        break;
-                    case 3: // Madara conversation
-                        img = (const uint16_t*)madara_cutsceneBitmap;
-                        if(dialoguePage==0) { sprintf(l1, "MADARA:"); sprintf(l2, "HOW WILL YOU HANDLE A SECOND"); }
-                        if(dialoguePage==1) { sprintf(l1, "MADARA:"); sprintf(l2, "METEOR?"); }
-                        break;
-                    // ... same case for other boss cutscenes ...
+                if (active_cutscene == 0) {
+                    img = (const uint16_t*)Zoro_cutsceneBitmap;
+                    sprintf(l1, "ZORO:");
+                    if(dialoguePage==0) sprintf(l2, "HEY YOU! YOU LOOK STRONG.");
+                    else if(dialoguePage==1) sprintf(l2, "I NEED TO TEST MY SWORDS.");
+                } else if (active_cutscene == 1) {
+                    img = (const uint16_t*)Kaido_cutsceneBitmap;
+                    sprintf(l1, "KAIDO:");
+                    if(dialoguePage==0) sprintf(l2, "YOU MADE IT THIS FAR...");
+                    else if(dialoguePage==1) sprintf(l2, "BUT THIS IS WHERE YOU DIE.");
+                } else if (active_cutscene == 2) {
+                    img = (const uint16_t*)Vegeta_cutsceneBitmap;
+                    sprintf(l1, "VEGETA:");
+                    if(dialoguePage==0) sprintf(l2, "FAREWELL, BULMA... TRUNKS...");
+                    else if(dialoguePage==1) sprintf(l2, "I WANTED TO BE EVIL AGAIN!");
+                    else if(dialoguePage==2) sprintf(l2, "I AM A PROUD SAIYAN PRINCE!");
+                } else if (active_cutscene == 3) {
+                    img = (const uint16_t*)madara_cutsceneBitmap;
+                    sprintf(l1, "MADARA:");
+                    if(dialoguePage==0) sprintf(l2, "HOW WILL YOU HANDLE A SECOND");
+                    else if(dialoguePage==1) sprintf(l2, "METEOR?");
                 }
 
                 volatile uint16_t* vram = (volatile uint16_t*)0x06000000;
-                if (img != NULL) {
-                    for(int i = 0; i < 38400; i++) vram[i] = img[i];
-                }
+                if (img != NULL) { copy16(img, vram, 76800); }
 
                 drawUIBoxMain(10, 110, 220, 45);
-                drawTextBox(l1, l2); // Draw portrait and text with colon
+                drawTextBox(l1, l2); 
                 
                 stateChanged = false;
             }
             if (isKeyJustPressed(KEY_A)) {
-                // Determine max pages per conversation and act
                 int maxPages = 0;
-                switch(active_cutscene) {
-                    case 1: maxPages = 2; break; // Kaido conversation 0 to 2
-                    case 2: maxPages = 2; break; // Vegeta conversation 0 to 2
-                    case 3: maxPages = 1; break; // Madara conversation 0 to 1
-                    // ... for other bosses ...
-                }
+                if (active_cutscene == 0) maxPages = 1;
+                else if (active_cutscene == 1) maxPages = 1;
+                else if (active_cutscene == 2) maxPages = 2;
+                else if (active_cutscene == 3) maxPages = 1;
+                
                 if (dialoguePage < maxPages) { dialoguePage++; stateChanged = true; } 
                 else { state = 2; startBattle(true); stateChanged = true; }
             }
         }
-        // ------------------------------------------
 
         else if (state == 9) { 
             if (stateChanged) {
                 REG_DISPCNT = 0x0403; drawRectMain(0, 0, 240, 160, 0x2108); 
-                drawUIBoxMain(10, 10, 220, 140); drawText("NURSE JOY:", 65, 20, COLOR_GOLD); // Add colon after name
+                drawUIBoxMain(10, 10, 220, 140); drawText("NURSE JOY:", 65, 20, COLOR_GOLD);
                 drawText("BERRIES:", 20, 40, COLOR_WHITE); drawNumber(berries, 90, 40, COLOR_GREEN);
                 
                 drawText("1. HEAL TEAM (FREE)", 30, 60, (shopCursor==0?COLOR_RED:COLOR_WHITE));
@@ -394,7 +394,7 @@ int main() {
         else if (state == 110) { 
             if (stateChanged) {
                 drawRectMain(0, 0, 240, 160, 0x2108); drawUIBoxMain(40, 40, 160, 80);
-                drawText("ENDLESS COLOSSEUM:", 50, 50, COLOR_GOLD); // Add colon after name
+                drawText("ENDLESS COLOSSEUM:", 50, 50, COLOR_GOLD); 
                 drawText("WAVE:", 60, 70, COLOR_WHITE); drawNumber(colosseumWave, 110, 70, COLOR_WHITE);
                 drawText("FIGHT", 60, 90, (menuCursor==0?COLOR_RED:COLOR_WHITE));
                 drawText("LEAVE", 60, 105, (menuCursor==1?COLOR_RED:COLOR_WHITE));
@@ -415,7 +415,7 @@ int main() {
         else if (state == 112) { 
             if (stateChanged) {
                 drawRectMain(0, 0, 240, 160, COLOR_BLACK); drawUIBoxMain(20, 40, 200, 80);
-                drawText("SYSTEM:", 50, 60, COLOR_RED); // Add colon after name
+                drawText("SYSTEM:", 50, 60, COLOR_RED); 
                 drawText("COLOSSEUM DEFEAT... WAVES CLEARED:", 40, 80, COLOR_WHITE); drawNumber(colosseumWave - 1, 150, 80, COLOR_GOLD);
                 stateChanged = false;
             }
@@ -424,7 +424,7 @@ int main() {
         else if (state == 75) { 
             if (stateChanged) {
                 drawRectMain(0, 0, 240, 160, 0x2108); drawUIBoxMain(40, 40, 160, 80);
-                drawText("SYSTEM:", 60, 50, COLOR_GOLD); // Add colon after name
+                drawText("SYSTEM:", 60, 50, COLOR_GOLD); 
                 drawText("--- PC SYSTEM --- DEPOSIT", 60, 70, (menuCursor==0?COLOR_RED:COLOR_WHITE)); drawText("WITHDRAW", 60, 90, (menuCursor==1?COLOR_RED:COLOR_WHITE));
                 drawText("EXIT", 60, 110, (menuCursor==2?COLOR_RED:COLOR_WHITE)); stateChanged = false;
             }
@@ -439,7 +439,7 @@ int main() {
         }
         else if (state == 76) { 
             if (stateChanged) {
-                drawRectMain(0, 0, 240, 160, 0x2108); drawUIBoxMain(20, 10, 200, 140); drawText("SYSTEM:", 75, 20, COLOR_GOLD); // Add colon after name
+                drawRectMain(0, 0, 240, 160, 0x2108); drawUIBoxMain(20, 10, 200, 140); drawText("SYSTEM:", 75, 20, COLOR_GOLD); 
                 drawText("DEPOSIT TO PC", 75, 30, COLOR_WHITE);
                 for(int i=0; i<6; i++) { 
                     if(team[i].isGevuld) {
@@ -466,7 +466,7 @@ int main() {
         }
         else if (state == 77) { 
             if (stateChanged) {
-                drawRectMain(0, 0, 240, 160, 0x2108); drawUIBoxMain(20, 10, 200, 140); drawText("SYSTEM:", 65, 20, COLOR_GOLD); // Add colon after name
+                drawRectMain(0, 0, 240, 160, 0x2108); drawUIBoxMain(20, 10, 200, 140); drawText("SYSTEM:", 65, 20, COLOR_GOLD); 
                 drawText("WITHDRAW FROM PC", 65, 30, COLOR_WHITE);
                 int displayCount = 0;
                 for(int i=0; i<30; i++) {
@@ -517,7 +517,7 @@ int main() {
         else if (state == 78) { 
             if (stateChanged) {
                 drawRectMain(0, 0, 240, 160, 0x2108); drawUIBoxMain(10, 10, 220, 140);
-                drawText("SYSTEM:", 30, 20, COLOR_GOLD); // Add colon after name
+                drawText("SYSTEM:", 30, 20, COLOR_GOLD); 
                 drawText("--- TYPE EFFECTIVENESS ---", 30, 30, COLOR_WHITE);
                 drawText("1. KI BEATS DEVIL FRUIT", 20, 45, COLOR_WHITE);
                 drawText("2. DEVIL FRUIT BEATS CHAKRA", 20, 60, COLOR_WHITE);
@@ -531,7 +531,7 @@ int main() {
         }
         else if (state == 73) { 
             if (stateChanged) {
-                drawRectMain(0, 0, 240, 160, 0x2108); drawUIBoxMain(10, 10, 220, 140); drawText("SYSTEM:", 15, 20, COLOR_GOLD); // Add colon after name
+                drawRectMain(0, 0, 240, 160, 0x2108); drawUIBoxMain(10, 10, 220, 140); drawText("SYSTEM:", 15, 20, COLOR_GOLD); 
                 drawText("YOUR BAG:", 15, 30, COLOR_WHITE);
                 for(int i = 0; i < 4; i++) {
                     uint16_t color = (bagCursor == i) ? COLOR_RED : COLOR_WHITE; if (itemAantal[i] <= 0) color = 0x3DEF; 
@@ -546,7 +546,7 @@ int main() {
         }
         else if (state == 74) { 
             if (stateChanged) { 
-                drawRectMain(0, 0, 240, 160, 0x2108); drawUIBoxMain(20, 10, 200, 140); drawText("SYSTEM:", 85, 20, COLOR_GOLD); // Add colon after name
+                drawRectMain(0, 0, 240, 160, 0x2108); drawUIBoxMain(20, 10, 200, 140); drawText("SYSTEM:", 85, 20, COLOR_GOLD); 
                 drawText("USE ITEM ON:", 85, 30, COLOR_WHITE);
                 for(int i=0; i<6; i++) { 
                     if(team[i].isGevuld) {
@@ -567,7 +567,7 @@ int main() {
         }
         else if (state == 71) { 
             if (stateChanged) { 
-                drawRectMain(0, 0, 240, 160, 0x2108); drawUIBoxMain(20, 10, 200, 140); drawText("SYSTEM:", 85, 20, COLOR_GOLD); // Add colon after name
+                drawRectMain(0, 0, 240, 160, 0x2108); drawUIBoxMain(20, 10, 200, 140); drawText("SYSTEM:", 85, 20, COLOR_GOLD); 
                 drawText("YOUR TEAM", 85, 30, COLOR_WHITE);
                 for(int i=0; i<6; i++) { 
                     if(team[i].isGevuld) { uint16_t c = (partyCursor == i) ? COLOR_RED : COLOR_WHITE; drawText(team[i].naam, 40, 40+i*15, c); }
@@ -632,6 +632,46 @@ int main() {
             if (isKeyJustPressed(KEY_A) || isKeyJustPressed(KEY_B)) { state = 1; stateChanged = true; }
         }
 
+        else if (state == 8) { 
+            if (stateChanged) { 
+                REG_DISPCNT = 0x0403; drawRectMain(0, 0, 240, 160, 0x2108);
+                int stage = regio_stage[regio];
+                
+                if (regio == 0) {
+                    if (stage == 2) drawTextBox("LUFFY:", "KAIDO IS MINE! LET'S SPAR FIRST!");
+                    else if (stage == 3) drawTextBox("KAIDO:", "YOU BRATS WANT TO PLAY PIRATE? WORORO!");
+                    else if (stage == 4) drawTextBox("SHANKS:", "I'M HERE TO TEST YOUR RESOLVE.");
+                } 
+                else if (regio == 1) { 
+                    if (stage == 1) drawTextBox("ZORO:", "THE MARINES ARE SWARMING THIS PLACE."); else if (stage == 2) drawTextBox("NARUTO:", "I WON'T LET MY FRIENDS DIE HERE!");
+                    else if (stage == 3) drawTextBox("PAIN:", "WAR ONLY BREEDS MORE PAIN."); else if (stage == 4) drawTextBox("SHANKS:", "I'VE COME TO PUT AN END TO THIS WAR.");
+                } 
+                else if (regio == 2) { 
+                    if (stage == 1) drawTextBox("GOKU:", "THIS IS BAD! BABIDI IS HERE.");
+                    else if (stage == 2) drawTextBox("OBITO:", "WELCOME TO BABIDI'S SPACESHIP.");
+                    else if (stage == 3) drawTextBox("VEGETA:", "I WANTED TO BE EVIL AGAIN!");
+                    else if (stage == 4) drawTextBox("GOKU:", "VEGETA HAS LOST HIS MIND COMPLETELY.");
+                } 
+                else if (regio == 3) { 
+                    if (stage == 1) drawTextBox("ITACHI:", "NARUTO... WHY SO OBSESSED WITH SASUKE?");
+                    else if (stage == 2) drawTextBox("PAIN:", "THIS VILLAGE HAS ENJOYED PEACE TOO LONG.");
+                    else if (stage == 3) drawTextBox("PAIN:", "DO YOU HATE ME NOW? GOOD.");
+                    else if (stage == 4) drawTextBox("OBITO:", "PAIN IS TAKING TOO LONG. I'LL STEP IN.");
+                    else drawTextBox("PAIN:", "MY PAIN IS STILL FAR GREATER THAN YOURS!");
+                } 
+                else if (regio == 4) { 
+                    if (stage == 1) drawTextBox("ITACHI:", "I AM EDO TENSEI. I CANNOT STOP MYSELF.");
+                    else if (stage == 2) drawTextBox("OBITO:", "YOU BROKE MY MASK... SO WHAT.");
+                    else if (stage == 3) drawTextBox("MADARA:", "SO, THE TIME HAS FINALLY COME.");
+                    else if (stage == 4) drawTextBox("OBITO:", "I HAVE ABSORBED THE TEN-TAILS.");
+                }
+                stateChanged = false; 
+            }
+            if (isKeyJustPressed(KEY_A)) { 
+                state = 2; startBattle(true); stateChanged = true; 
+            }
+        }
+
         else if (state == 88 || state == 89) { 
             if (stateChanged) { 
                 REG_DISPCNT = 0x0403; drawRectMain(0, 0, 240, 160, 0x2108); 
@@ -649,7 +689,7 @@ int main() {
             }
             if (animTimer == 40) {
                 drawRectMain(0, 0, 240, 160, COLOR_BLACK); 
-                drawUIBoxMain(10, 110, 220, 45); drawText("SYSTEM:", 20, 120, COLOR_GREEN); drawText(teamPending[activeIdx].evolution_newname, 20, 135, COLOR_WHITE);
+                drawUIBoxMain(10, 110, 220, 45); drawText("SYSTEM:", 20, 120, COLOR_GREEN); drawText(team[activeIdx].naam, 20, 135, COLOR_WHITE);
             }
             if (animTimer <= 0 && isKeyJustPressed(KEY_A)) { state = 1; stateChanged = true; initOAM(); }
         }
