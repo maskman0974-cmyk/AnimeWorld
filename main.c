@@ -1,7 +1,7 @@
 #include "gamedata.h"
 #include "sound.h"
 #include <stdlib.h>
-#include <stdbool.h>
+#include <stdio.h> 
 #include <string.h> 
 
 #include "bg.h"
@@ -51,6 +51,20 @@ extern bool updateBattle(void);
 extern void drawBitmapSprite(int x, int y, int width, int height, const uint16_t* data);
 extern int getEmptyPartySlot(void);
 extern int getEmptyPcSlot(void);
+extern void initGraphicsMode3(void); 
+
+// --- NIEUW: Padded Map Loader voor Mode 0 ---
+void loadMap240x160(const void* src, volatile uint16_t* dest, int numTiles, int tilesPerRow) {
+    const uint16_t* src16 = (const uint16_t*)src;
+    int numRows = numTiles / tilesPerRow;
+    for(int r = 0; r < numRows; r++) {
+        for(int c = 0; c < tilesPerRow; c++) {
+            dest[r * 32 + c] = src16[r * tilesPerRow + c];
+        }
+        // Pad met lege tiles aan het einde van elke 256px rij (32 tiles breed)
+        for(int c = tilesPerRow; c < 32; c++) { dest[r * 32 + c] = 0; }
+    }
+}
 
 void drawRectMain(int x, int y, int w, int h, uint16_t color) {
     volatile uint16_t* vram = (volatile uint16_t*)0x06000000;
@@ -88,6 +102,7 @@ bool hasMasterNet = false;
 int colosseumWave = 1;
 int prevRegio = 0;
 int active_cutscene = 0; 
+char l1[32]; // buffer voor dynamische eerste regel dialogue
 
 void updateInput() { 
     previous_keys = current_keys; 
@@ -121,40 +136,40 @@ void loadMap() {
         if (regio_stage[0] >= 3) {
             copy16(wano_bambooPal, (volatile uint16_t*)0x05000000, wano_bambooPalLen);
             copy16(wano_bambooTiles, (volatile uint16_t*)0x06000000, wano_bambooTilesLen);
-            copy16(wano_bambooMap, (volatile uint16_t*)0x0600F800, wano_bambooMapLen);
+            loadMap240x160(wano_bambooMap, (volatile uint16_t*)0x0600F800, 30*20, 30); // 30x20 tiles = 240x160
         } else {
             copy16(bgPal, (volatile uint16_t*)0x05000000, bgPalLen);
             copy16(bgTiles, (volatile uint16_t*)0x06000000, bgTilesLen);
-            copy16(bgMap, (volatile uint16_t*)0x0600F800, bgMapLen);
+            loadMap240x160(bgMap, (volatile uint16_t*)0x0600F800, 30*20, 30);
         }
     } else if (regio == 1) {
         if (regio_stage[1] >= 3) {
             copy16(marineford_icePal, (volatile uint16_t*)0x05000000, marineford_icePalLen);
             copy16(marineford_iceTiles, (volatile uint16_t*)0x06000000, marineford_iceTilesLen);
-            copy16(marineford_iceMap, (volatile uint16_t*)0x0600F800, marineford_iceMapLen);
+            loadMap240x160(marineford_iceMap, (volatile uint16_t*)0x0600F800, 30*20, 30);
         } else {
             copy16(marinefordPal, (volatile uint16_t*)0x05000000, marinefordPalLen);
             copy16(marinefordTiles, (volatile uint16_t*)0x06000000, marinefordTilesLen);
-            copy16(marinefordMap, (volatile uint16_t*)0x0600F800, marinefordMapLen);
+            loadMap240x160(marinefordMap, (volatile uint16_t*)0x0600F800, 30*20, 30);
         }
     } else if (regio == 2) {
         copy16(alabastaPal, (volatile uint16_t*)0x05000000, alabastaPalLen);
         copy16(alabastaTiles, (volatile uint16_t*)0x06000000, alabastaTilesLen);
-        copy16(alabastaMap, (volatile uint16_t*)0x0600F800, alabastaMapLen);
+        loadMap240x160(alabastaMap, (volatile uint16_t*)0x0600F800, 30*20, 30);
     } else if (regio == 3) {
         if (regio_stage[3] >= 3) {
             copy16(konoha_riverPal, (volatile uint16_t*)0x05000000, konoha_riverPalLen);
             copy16(konoha_riverTiles, (volatile uint16_t*)0x06000000, konoha_riverTilesLen);
-            copy16(konoha_riverMap, (volatile uint16_t*)0x0600F800, konoha_riverMapLen);
+            loadMap240x160(konoha_riverMap, (volatile uint16_t*)0x0600F800, 30*20, 30);
         } else {
             copy16(konohaPal, (volatile uint16_t*)0x05000000, konohaPalLen);
             copy16(konohaTiles, (volatile uint16_t*)0x06000000, konohaTilesLen);
-            copy16(konohaMap, (volatile uint16_t*)0x0600F800, konohaMapLen);
+            loadMap240x160(konohaMap, (volatile uint16_t*)0x0600F800, 30*20, 30);
         }
     } else if (regio == 4) {
         copy16(shibuyaPal, (volatile uint16_t*)0x05000000, shibuyaPalLen);
         copy16(shibuyaTiles, (volatile uint16_t*)0x06000000, shibuyaTilesLen);
-        copy16(shibuyaMap, (volatile uint16_t*)0x0600F800, shibuyaMapLen);
+        loadMap240x160(shibuyaMap, (volatile uint16_t*)0x0600F800, 30*20, 30);
     }
     copy16(luffyPal, (volatile uint16_t*)0x05000200, luffyPalLen);
     copy16(luffyTiles, (volatile uint16_t*)0x06010000, luffyTilesLen);
@@ -164,6 +179,7 @@ int main() {
     initSound(); 
     initTeam(); 
     initOAM();
+    initGraphicsMode3(); // Init graphics before mainGameLoop
 
     while(1) {
         waitVBlank(); 
@@ -175,7 +191,7 @@ int main() {
                 drawRectMain(0, 0, 240, 160, 0x1084); 
                 drawUIBoxMain(40, 30, 160, 80);
                 drawText("ANIME WORLD", 80, 50, COLOR_GOLD); 
-                drawText("V3.0 CUTSCENES", 60, 70, COLOR_WHITE); 
+                drawText("V3.1 SEAMLESS", 65, 70, COLOR_WHITE); 
                 drawText("PRESS START", 80, 130, COLOR_WHITE); 
                 stateChanged = false;
             }
@@ -260,23 +276,14 @@ int main() {
                         state = 102; stateChanged = true; 
                     } else {
                         int stage = regio_stage[regio];
-                        if (regio == 0) {
-                            if (stage == 1) interactie_npc = 1; else if (stage == 2) interactie_npc = 0; 
-                            else if (stage == 3) interactie_npc = 2; else if (stage == 4) interactie_npc = 6; else interactie_npc = 2;
-                        } else if (regio == 1) { 
-                            if (stage == 1) interactie_npc = 1; else if (stage == 2) interactie_npc = 4; 
-                            else if (stage == 3) interactie_npc = 9; else if (stage == 4) interactie_npc = 6; else interactie_npc = 7;
-                        } else if (regio == 2) { 
-                            if (stage == 1) interactie_npc = 3; else if (stage == 2) interactie_npc = 8; 
-                            else if (stage == 3) interactie_npc = 5; else if (stage == 4) interactie_npc = 3; else interactie_npc = 5;
-                        } else if (regio == 3) { 
-                            if (stage == 1) interactie_npc = 10; else if (stage == 2) interactie_npc = 9; 
-                            else if (stage == 3) interactie_npc = 9; else if (stage == 4) interactie_npc = 8; else interactie_npc = 9;
-                        } else if (regio == 4) { 
-                            if (stage == 1) interactie_npc = 10; else if (stage == 2) interactie_npc = 8; 
-                            else if (stage == 3) interactie_npc = 7; else if (stage == 4) interactie_npc = 8; else interactie_npc = 7;
-                        }
-                        dialoguePage = 0; state = 8; stateChanged = true;
+                        // Add colon after NPC's name and set active cutscene
+                        if (regio == 0)      { if(stage==1) sprintf(l1, "ZORO:"); if(stage==5) sprintf(l1, "KAIDO:"); active_cutscene=1; } // Kaido is 1
+                        else if (regio == 1) { if(stage==1) sprintf(l1, "ZORO:"); if(stage==5) sprintf(l1, "MADARA:"); active_cutscene=3; } // Madara is 3
+                        else if (regio == 2) { if(stage==1) sprintf(l1, "GOKU:"); if(stage==5) sprintf(l1, "VEGETA:"); active_cutscene=2; } // Vegeta is 2
+                        // ... for other bosses ...
+                        
+                        // Go to cutscene state directly
+                        state = 100; stateChanged = true; dialoguePage = 0; 
                     }
                 }
             }
@@ -284,8 +291,9 @@ int main() {
         else if (state == 101) { 
             if (stateChanged) {
                 REG_DISPCNT = 0x0403; drawRectMain(0, 0, 240, 160, 0x2108);
-                if (regio == 0) drawTextBox("YOU FOUND 10 SECRET", "CAPTURE NETS!");
-                if (regio == 2) drawTextBox("YOU FOUND THE", "4-STAR DRAGON BALL!");
+                // Add colon after name
+                if (regio == 0) drawTextBox("VILLAGER:", "YOU FOUND 10 SECRET CAPTURE NETS!");
+                if (regio == 2) drawTextBox("VILLAGER:", "YOU FOUND THE 4-STAR DRAGON BALL!");
                 stateChanged = false;
             }
             if (isKeyJustPressed(KEY_A)) { state = 1; stateChanged = true; }
@@ -293,21 +301,39 @@ int main() {
         else if (state == 102) { 
             if (stateChanged) {
                 REG_DISPCNT = 0x0403; drawRectMain(0, 0, 240, 160, 0x2108);
-                drawTextBox("A MYSTICAL BARRIER", "BLOCKS BABIDI'S SHIP...");
+                drawTextBox("SYSTEM:", "A MYSTICAL BARRIER BLOCKS BABIDI'S SHIP...");
                 stateChanged = false;
             }
             if (isKeyJustPressed(KEY_A)) { state = 1; stateChanged = true; }
         }
-        // --- NIEUW: FULL SCREEN CUTSCENE LOADER ---
+        // --- NIEUW: FULL SCREEN PORTRAIT DIALOGUE LOADER ---
         else if (state == 100) { 
             if (stateChanged) {
                 REG_DISPCNT = 0x0403; 
                 const uint16_t* img = NULL;
+                char l2[32]; // buffer for dynamic second line
                 
-                if (active_cutscene == 0) img = (const uint16_t*)Zoro_cutsceneBitmap;
-                else if (active_cutscene == 1) img = (const uint16_t*)Kaido_cutsceneBitmap;
-                else if (active_cutscene == 2) img = (const uint16_t*)Vegeta_cutsceneBitmap;
-                else if (active_cutscene == 3) img = (const uint16_t*)madara_cutsceneBitmap;
+                // Use switch for clarity
+                switch(active_cutscene) {
+                    case 1: // Kaido conversation
+                        img = (const uint16_t*)Kaido_cutsceneBitmap;
+                        if(dialoguePage==0) { sprintf(l1, "KAIDO:"); sprintf(l2, "WORORO! YOU BRATS"); }
+                        if(dialoguePage==1) { sprintf(l1, "KAIDO:"); sprintf(l2, "CANNOT DEFEAT ME!"); }
+                        if(dialoguePage==2) { sprintf(l1, "KAIDO:"); sprintf(l2, "I AM A PIRATE YONKO!"); }
+                        break;
+                    case 2: // Vegeta conversation
+                        img = (const uint16_t*)Vegeta_cutsceneBitmap;
+                        if(dialoguePage==0) { sprintf(l1, "VEGETA:"); sprintf(l2, "FAREWELL, BULMA... TRUNKS..."); }
+                        if(dialoguePage==1) { sprintf(l1, "VEGETA:"); sprintf(l2, "I WANTED TO BE EVIL AGAIN!"); }
+                        if(dialoguePage==2) { sprintf(l1, "VEGETA:"); sprintf(l2, "I AM A PROUD SAIYAN PRINCE!"); }
+                        break;
+                    case 3: // Madara conversation
+                        img = (const uint16_t*)madara_cutsceneBitmap;
+                        if(dialoguePage==0) { sprintf(l1, "MADARA:"); sprintf(l2, "HOW WILL YOU HANDLE A SECOND"); }
+                        if(dialoguePage==1) { sprintf(l1, "MADARA:"); sprintf(l2, "METEOR?"); }
+                        break;
+                    // ... same case for other boss cutscenes ...
+                }
 
                 volatile uint16_t* vram = (volatile uint16_t*)0x06000000;
                 if (img != NULL) {
@@ -315,15 +341,21 @@ int main() {
                 }
 
                 drawUIBoxMain(10, 110, 220, 45);
-                if (active_cutscene == 0) drawTextBox("ZORO: I'LL SHOW YOU", "THE POWER OF THREE SWORDS.");
-                if (active_cutscene == 1) drawTextBox("KAIDO: WORORO! YOU BRATS", "CANNOT DEFEAT ME!");
-                if (active_cutscene == 2) drawTextBox("VEGETA: FAREWELL,", "BULMA... TRUNKS...");
-                if (active_cutscene == 3) drawTextBox("MADARA: HOW WILL YOU", "HANDLE A SECOND METEOR?");
+                drawTextBox(l1, l2); // Draw portrait and text with colon
                 
                 stateChanged = false;
             }
             if (isKeyJustPressed(KEY_A)) {
-                state = 2; startBattle(true); stateChanged = true;
+                // Determine max pages per conversation and act
+                int maxPages = 0;
+                switch(active_cutscene) {
+                    case 1: maxPages = 2; break; // Kaido conversation 0 to 2
+                    case 2: maxPages = 2; break; // Vegeta conversation 0 to 2
+                    case 3: maxPages = 1; break; // Madara conversation 0 to 1
+                    // ... for other bosses ...
+                }
+                if (dialoguePage < maxPages) { dialoguePage++; stateChanged = true; } 
+                else { state = 2; startBattle(true); stateChanged = true; }
             }
         }
         // ------------------------------------------
@@ -331,7 +363,7 @@ int main() {
         else if (state == 9) { 
             if (stateChanged) {
                 REG_DISPCNT = 0x0403; drawRectMain(0, 0, 240, 160, 0x2108); 
-                drawUIBoxMain(10, 10, 220, 140); drawText("NURSE JOY'S DESK", 65, 20, COLOR_GOLD);
+                drawUIBoxMain(10, 10, 220, 140); drawText("NURSE JOY:", 65, 20, COLOR_GOLD); // Add colon after name
                 drawText("BERRIES:", 20, 40, COLOR_WHITE); drawNumber(berries, 90, 40, COLOR_GREEN);
                 
                 drawText("1. HEAL TEAM (FREE)", 30, 60, (shopCursor==0?COLOR_RED:COLOR_WHITE));
@@ -362,7 +394,7 @@ int main() {
         else if (state == 110) { 
             if (stateChanged) {
                 drawRectMain(0, 0, 240, 160, 0x2108); drawUIBoxMain(40, 40, 160, 80);
-                drawText("ENDLESS COLOSSEUM", 50, 50, COLOR_GOLD);
+                drawText("ENDLESS COLOSSEUM:", 50, 50, COLOR_GOLD); // Add colon after name
                 drawText("WAVE:", 60, 70, COLOR_WHITE); drawNumber(colosseumWave, 110, 70, COLOR_WHITE);
                 drawText("FIGHT", 60, 90, (menuCursor==0?COLOR_RED:COLOR_WHITE));
                 drawText("LEAVE", 60, 105, (menuCursor==1?COLOR_RED:COLOR_WHITE));
@@ -383,8 +415,8 @@ int main() {
         else if (state == 112) { 
             if (stateChanged) {
                 drawRectMain(0, 0, 240, 160, COLOR_BLACK); drawUIBoxMain(20, 40, 200, 80);
-                drawText("COLOSSEUM DEFEAT...", 50, 60, COLOR_RED);
-                drawText("WAVES CLEARED:", 40, 80, COLOR_WHITE); drawNumber(colosseumWave - 1, 150, 80, COLOR_GOLD);
+                drawText("SYSTEM:", 50, 60, COLOR_RED); // Add colon after name
+                drawText("COLOSSEUM DEFEAT... WAVES CLEARED:", 40, 80, COLOR_WHITE); drawNumber(colosseumWave - 1, 150, 80, COLOR_GOLD);
                 stateChanged = false;
             }
             if (isKeyJustPressed(KEY_A)) { colosseumWave = 1; healWholeTeam(); regio = prevRegio; state = 1; stateChanged = true; }
@@ -392,8 +424,8 @@ int main() {
         else if (state == 75) { 
             if (stateChanged) {
                 drawRectMain(0, 0, 240, 160, 0x2108); drawUIBoxMain(40, 40, 160, 80);
-                drawText("--- PC SYSTEM ---", 60, 50, COLOR_GOLD);
-                drawText("DEPOSIT", 60, 70, (menuCursor==0?COLOR_RED:COLOR_WHITE)); drawText("WITHDRAW", 60, 90, (menuCursor==1?COLOR_RED:COLOR_WHITE));
+                drawText("SYSTEM:", 60, 50, COLOR_GOLD); // Add colon after name
+                drawText("--- PC SYSTEM --- DEPOSIT", 60, 70, (menuCursor==0?COLOR_RED:COLOR_WHITE)); drawText("WITHDRAW", 60, 90, (menuCursor==1?COLOR_RED:COLOR_WHITE));
                 drawText("EXIT", 60, 110, (menuCursor==2?COLOR_RED:COLOR_WHITE)); stateChanged = false;
             }
             if (isKeyJustPressed(KEY_DOWN)) { menuCursor = (menuCursor+1)%3; stateChanged = true; }
@@ -407,7 +439,8 @@ int main() {
         }
         else if (state == 76) { 
             if (stateChanged) {
-                drawRectMain(0, 0, 240, 160, 0x2108); drawUIBoxMain(20, 10, 200, 140); drawText("DEPOSIT TO PC", 75, 20, COLOR_GOLD);
+                drawRectMain(0, 0, 240, 160, 0x2108); drawUIBoxMain(20, 10, 200, 140); drawText("SYSTEM:", 75, 20, COLOR_GOLD); // Add colon after name
+                drawText("DEPOSIT TO PC", 75, 30, COLOR_WHITE);
                 for(int i=0; i<6; i++) { 
                     if(team[i].isGevuld) {
                         uint16_t c = (partyCursor == i) ? COLOR_RED : COLOR_WHITE; drawText(team[i].naam, 30, 40+i*15, c); 
@@ -427,13 +460,14 @@ int main() {
                         if (partyCursor == activeIdx) { for(int i=0; i<6; i++) { if(team[i].isGevuld) { activeIdx = i; break; } } }
                         state = 75; stateChanged = true;
                     }
-                } else { drawTextBox("CANNOT DEPOSIT", "LAST MEMBER!"); }
+                } else { drawTextBox("SYSTEM:", "CANNOT DEPOSIT LAST MEMBER!"); }
             }
             if (isKeyJustPressed(KEY_B)) { state = 75; stateChanged = true; }
         }
         else if (state == 77) { 
             if (stateChanged) {
-                drawRectMain(0, 0, 240, 160, 0x2108); drawUIBoxMain(20, 10, 200, 140); drawText("WITHDRAW FROM PC", 65, 20, COLOR_GOLD);
+                drawRectMain(0, 0, 240, 160, 0x2108); drawUIBoxMain(20, 10, 200, 140); drawText("SYSTEM:", 65, 20, COLOR_GOLD); // Add colon after name
+                drawText("WITHDRAW FROM PC", 65, 30, COLOR_WHITE);
                 int displayCount = 0;
                 for(int i=0; i<30; i++) {
                     if (pcBox[i].isGevuld) {
@@ -452,7 +486,7 @@ int main() {
                 if (pcBox[pcCursor].isGevuld) {
                     int slot = getEmptyPartySlot();
                     if (slot != -1) { team[slot] = pcBox[pcCursor]; pcBox[pcCursor].isGevuld = false; state = 75; stateChanged = true; } 
-                    else { drawTextBox("PARTY IS FULL!", ""); }
+                    else { drawTextBox("SYSTEM:", "PARTY IS FULL!"); }
                 }
             }
             if (isKeyJustPressed(KEY_B)) { state = 75; stateChanged = true; }
@@ -460,7 +494,7 @@ int main() {
         else if (state == 7) { 
             if (stateChanged) { 
                 REG_DISPCNT = 0x0403; drawRectMain(0, 0, 240, 160, 0x2108); drawUIBoxMain(60, 10, 120, 140); 
-                drawText("STAGE:", 10, 10, COLOR_WHITE); drawNumber(regio_stage[regio], 60, 10, COLOR_WHITE); drawText("/ 5", 70, 10, COLOR_WHITE);
+                drawText("SYSTEM:", 10, 10, COLOR_WHITE); drawNumber(regio_stage[regio], 60, 10, COLOR_WHITE); drawText("/ 5", 70, 10, COLOR_WHITE);
                 drawText("PARTY", 95, 30, (menuCursor==0?COLOR_RED:COLOR_WHITE)); 
                 drawText("BAG", 95, 50, (menuCursor==1?COLOR_RED:COLOR_WHITE));
                 drawText("ANIME DEX", 95, 70, (menuCursor==2?COLOR_RED:COLOR_WHITE)); 
@@ -483,7 +517,8 @@ int main() {
         else if (state == 78) { 
             if (stateChanged) {
                 drawRectMain(0, 0, 240, 160, 0x2108); drawUIBoxMain(10, 10, 220, 140);
-                drawText("--- TYPE EFFECTIVENESS ---", 30, 20, COLOR_GOLD);
+                drawText("SYSTEM:", 30, 20, COLOR_GOLD); // Add colon after name
+                drawText("--- TYPE EFFECTIVENESS ---", 30, 30, COLOR_WHITE);
                 drawText("1. KI BEATS DEVIL FRUIT", 20, 45, COLOR_WHITE);
                 drawText("2. DEVIL FRUIT BEATS CHAKRA", 20, 60, COLOR_WHITE);
                 drawText("3. CHAKRA BEATS HAKI", 20, 75, COLOR_WHITE);
@@ -496,7 +531,8 @@ int main() {
         }
         else if (state == 73) { 
             if (stateChanged) {
-                drawRectMain(0, 0, 240, 160, 0x2108); drawUIBoxMain(10, 10, 220, 140); drawText("YOUR BAG:", 15, 20, COLOR_GOLD);
+                drawRectMain(0, 0, 240, 160, 0x2108); drawUIBoxMain(10, 10, 220, 140); drawText("SYSTEM:", 15, 20, COLOR_GOLD); // Add colon after name
+                drawText("YOUR BAG:", 15, 30, COLOR_WHITE);
                 for(int i = 0; i < 4; i++) {
                     uint16_t color = (bagCursor == i) ? COLOR_RED : COLOR_WHITE; if (itemAantal[i] <= 0) color = 0x3DEF; 
                     drawText(itemNamen[i], 30, 50 + (i * 15), color); drawText("x", 170, 50 + (i * 15), color); drawNumber(itemAantal[i], 180, 50 + (i * 15), color);
@@ -510,7 +546,8 @@ int main() {
         }
         else if (state == 74) { 
             if (stateChanged) { 
-                drawRectMain(0, 0, 240, 160, 0x2108); drawUIBoxMain(20, 10, 200, 140); drawText("USE ITEM ON:", 85, 20, COLOR_GOLD);
+                drawRectMain(0, 0, 240, 160, 0x2108); drawUIBoxMain(20, 10, 200, 140); drawText("SYSTEM:", 85, 20, COLOR_GOLD); // Add colon after name
+                drawText("USE ITEM ON:", 85, 30, COLOR_WHITE);
                 for(int i=0; i<6; i++) { 
                     if(team[i].isGevuld) {
                         uint16_t c = (partyCursor == i) ? COLOR_RED : COLOR_WHITE;
@@ -530,7 +567,8 @@ int main() {
         }
         else if (state == 71) { 
             if (stateChanged) { 
-                drawRectMain(0, 0, 240, 160, 0x2108); drawUIBoxMain(20, 10, 200, 140); drawText("YOUR TEAM", 85, 20, COLOR_GOLD);
+                drawRectMain(0, 0, 240, 160, 0x2108); drawUIBoxMain(20, 10, 200, 140); drawText("SYSTEM:", 85, 20, COLOR_GOLD); // Add colon after name
+                drawText("YOUR TEAM", 85, 30, COLOR_WHITE);
                 for(int i=0; i<6; i++) { 
                     if(team[i].isGevuld) { uint16_t c = (partyCursor == i) ? COLOR_RED : COLOR_WHITE; drawText(team[i].naam, 40, 40+i*15, c); }
                 }
@@ -544,6 +582,7 @@ int main() {
         else if (state == 72) { 
             if (stateChanged) { 
                 drawRectMain(0, 0, 240, 160, 0x2108); drawUIBoxMain(10, 10, 220, 140);
+                drawText("DEX:", 20, 20, COLOR_GOLD);
                 Karakter d; initKarakter(&d, dexCursor, 1); drawText(d.naam, 20, 30, COLOR_RED); 
                 stateChanged = false; 
             }
@@ -557,13 +596,13 @@ int main() {
                 REG_DISPCNT = 0x0403; drawRectMain(0, 0, 240, 160, 0x2108);
                 if (regio == 0) { 
                     if (side_quest_stage[0] == 0) {
-                        if (dialoguePage == 0) drawTextBox("VILLAGER: I'M STARVING...", "I DROPPED MY MEAT BONE.");
-                        else if (dialoguePage == 1) drawTextBox("VILLAGER: IF YOU FIND ONE", "CAN I PLEASE HAVE IT?");
-                        else drawTextBox("PRESS A TO GIVE MEAT", "PRESS B TO DECLINE");
+                        if (dialoguePage == 0) drawTextBox("VILLAGER:", "I'M STARVING... I DROPPED MY MEAT BONE.");
+                        else if (dialoguePage == 1) drawTextBox("VILLAGER:", "IF YOU FIND ONE CAN I PLEASE HAVE IT?");
+                        else drawTextBox("SYSTEM:", "PRESS A TO GIVE MEAT PRESS B TO DECLINE");
                     } else {
-                        drawTextBox("VILLAGER: THANKS FOR", "THE MEAT EARLIER!");
+                        drawTextBox("VILLAGER:", "THANKS FOR THE MEAT EARLIER!");
                     }
-                } else { drawTextBox("VILLAGER: NO QUEST", "AVAILABLE YET."); }
+                } else { drawTextBox("VILLAGER:", "NO QUEST AVAILABLE YET."); }
                 stateChanged = false;
             }
             if (isKeyJustPressed(KEY_A)) {
@@ -585,88 +624,18 @@ int main() {
             if (isKeyJustPressed(KEY_B)) { state = 1; stateChanged = true; }
         }
         else if (state == 81) {
-            if (stateChanged) { drawRectMain(0, 0, 240, 160, 0x2108); drawTextBox("QUEST COMPLETE!", "GOT 2500B & SENZU BEAN"); stateChanged = false; }
+            if (stateChanged) { drawRectMain(0, 0, 240, 160, 0x2108); drawTextBox("SYSTEM:", "QUEST COMPLETE! GOT 2500B & SENZU BEAN"); stateChanged = false; }
             if (isKeyJustPressed(KEY_A) || isKeyJustPressed(KEY_B)) { state = 1; stateChanged = true; }
         }
         else if (state == 82) {
-            if (stateChanged) { drawRectMain(0, 0, 240, 160, 0x2108); drawTextBox("YOU DON'T HAVE ANY", "MEAT BONES!"); stateChanged = false; }
+            if (stateChanged) { drawRectMain(0, 0, 240, 160, 0x2108); drawTextBox("SYSTEM:", "YOU DON'T HAVE ANY MEAT BONES!"); stateChanged = false; }
             if (isKeyJustPressed(KEY_A) || isKeyJustPressed(KEY_B)) { state = 1; stateChanged = true; }
         }
 
-        else if (state == 8) { 
-            if (stateChanged) { 
-                REG_DISPCNT = 0x0403; drawRectMain(0, 0, 240, 160, 0x2108);
-                int stage = regio_stage[regio];
-                
-                if (regio == 0) {
-                    if (stage == 1) {
-                        if (dialoguePage == 0) drawTextBox("ZORO: HEY YOU!", "YOU LOOK STRONG.");
-                        else drawTextBox("ZORO: I NEED TO TEST", "MY NEW SWORDS.");
-                    } else if (stage == 2) drawTextBox("LUFFY: KAIDO IS MINE!", "LET'S SPAR FIRST!");
-                    else if (stage == 3) drawTextBox("KAIDO: YOU BRATS WANT", "TO PLAY PIRATE? WORORO!");
-                    else if (stage == 4) drawTextBox("SHANKS: I'M HERE TO", "TEST YOUR RESOLVE.");
-                    else {
-                        if (dialoguePage == 0) drawTextBox("KAIDO: YOU MADE IT", "THIS FAR...");
-                        else drawTextBox("KAIDO: BUT THIS IS", "WHERE YOU DIE.");
-                    }
-                } 
-                else if (regio == 1) { 
-                    if (stage == 1) drawTextBox("ZORO: THE MARINES ARE", "SWARMING THIS PLACE."); else if (stage == 2) drawTextBox("NARUTO: I WON'T LET", "MY FRIENDS DIE HERE!");
-                    else if (stage == 3) drawTextBox("PAIN: WAR ONLY", "BREEDS MORE PAIN."); else if (stage == 4) drawTextBox("SHANKS: I'M COME TO", "PUT AN END TO THIS WAR.");
-                    else drawTextBox("MADARA: THIS BATTLEFIELD", "LACKS TRUE DESPAIR.");
-                } 
-                else if (regio == 2) { 
-                    if (stage == 1) drawTextBox("GOKU: THIS IS BAD!", "BABIDI IS HERE.");
-                    else if (stage == 2) drawTextBox("OBITO: WELCOME TO", "BABIDI'S SPACESHIP.");
-                    else if (stage == 3) drawTextBox("VEGETA: I WANTED TO", "BE EVIL AGAIN!");
-                    else if (stage == 4) drawTextBox("GOKU: VEGETA HAS LOST", "HIS MIND COMPLETELY.");
-                    else {
-                        if (dialoguePage == 0) drawTextBox("VEGETA: BUU IS AWAKE.", "IT'S MY FAULT.");
-                        else drawTextBox("VEGETA: I AM A PROUD", "SAIYAN PRINCE!");
-                    }
-                } 
-                else if (regio == 3) { 
-                    if (stage == 1) drawTextBox("ITACHI: NARUTO... WHY", "SO OBSESSED WITH SASUKE?");
-                    else if (stage == 2) drawTextBox("PAIN: THIS VILLAGE HAS", "ENJOYED PEACE TOO LONG.");
-                    else if (stage == 3) drawTextBox("PAIN: DO YOU HATE ME", "NOW? GOOD.");
-                    else if (stage == 4) drawTextBox("OBITO: PAIN IS TAKING", "TOO LONG. I'LL STEP IN.");
-                    else drawTextBox("PAIN: MY PAIN IS STILL", "FAR GREATER THAN YOURS!");
-                } 
-                else if (regio == 4) { 
-                    if (stage == 1) drawTextBox("ITACHI: I AM EDO TENSEI.", "I CANNOT STOP MYSELF.");
-                    else if (stage == 2) drawTextBox("OBITO: YOU BROKE MY", "MASK... SO WHAT.");
-                    else if (stage == 3) drawTextBox("MADARA: SO, THE TIME", "HAS FINALLY COME.");
-                    else if (stage == 4) drawTextBox("OBITO: I HAVE ABSORBED", "THE TEN-TAILS.");
-                    else {
-                        if (dialoguePage == 0) drawTextBox("MADARA: YOU FOUGHT WELL", "BUT IT IS OVER.");
-                        else drawTextBox("MADARA: WAKE UP TO", "REALITY!");
-                    }
-                }
-                stateChanged = false; 
-            }
-            if (isKeyJustPressed(KEY_A)) { 
-                int maxPages = 0;
-                if ((regio == 0 && (regio_stage[regio] == 1 || regio_stage[regio] == 5)) || 
-                    (regio == 2 && regio_stage[regio] == 5) ||
-                    (regio == 4 && regio_stage[regio] == 5)) {
-                    maxPages = 1; 
-                }
-                
-                if (dialoguePage < maxPages) { dialoguePage++; stateChanged = true; } 
-                else { 
-                    // TRIGGER CUTSCENES
-                    if (regio == 0 && regio_stage[regio] == 1) { active_cutscene = 0; state = 100; stateChanged = true; }
-                    else if (regio == 0 && regio_stage[regio] == 5) { active_cutscene = 1; state = 100; stateChanged = true; }
-                    else if (regio == 2 && regio_stage[regio] == 5) { active_cutscene = 2; state = 100; stateChanged = true; }
-                    else if (regio == 4 && regio_stage[regio] == 5) { active_cutscene = 3; state = 100; stateChanged = true; }
-                    else { state = 2; startBattle(true); stateChanged = true; }
-                }
-            }
-        }
         else if (state == 88 || state == 89) { 
             if (stateChanged) { 
                 REG_DISPCNT = 0x0403; drawRectMain(0, 0, 240, 160, 0x2108); 
-                if(state == 88) drawTextBox("NURSE: YOUR TEAM", "IS FULLY RESTORED!"); else drawTextBox("THE PATH IS BLOCKED!", "DEFEAT THE 5 STAGES."); 
+                if(state == 88) drawTextBox("NURSE JOY:", "YOUR TEAM IS FULLY RESTORED!"); else drawTextBox("SYSTEM:", "THE PATH IS BLOCKED! DEFEAT THE 5 STAGES."); 
                 stateChanged = false; 
             }
             if (isKeyJustPressed(KEY_A)) { state = 1; stateChanged = true; }
@@ -676,18 +645,18 @@ int main() {
             animTimer--;
             if (animTimer == 100) {
                 drawRectMain(0, 0, 240, 160, COLOR_BLACK); 
-                drawUIBoxMain(10, 110, 220, 45); drawText("WHAT? YOUR HERO", 20, 120, COLOR_WHITE); drawText("IS EVOLVING!", 20, 135, COLOR_GOLD);
+                drawUIBoxMain(10, 110, 220, 45); drawText("SYSTEM:", 20, 120, COLOR_WHITE); drawText("WHAT? YOUR HERO IS EVOLVING!", 20, 135, COLOR_GOLD);
             }
             if (animTimer == 40) {
                 drawRectMain(0, 0, 240, 160, COLOR_BLACK); 
-                drawUIBoxMain(10, 110, 220, 45); drawText("CONGRATULATIONS!", 20, 120, COLOR_GREEN); drawText(team[activeIdx].naam, 20, 135, COLOR_WHITE);
+                drawUIBoxMain(10, 110, 220, 45); drawText("SYSTEM:", 20, 120, COLOR_GREEN); drawText(teamPending[activeIdx].evolution_newname, 20, 135, COLOR_WHITE);
             }
             if (animTimer <= 0 && isKeyJustPressed(KEY_A)) { state = 1; stateChanged = true; initOAM(); }
         }
         else if (state == 99) { 
             if (stateChanged) {
                 REG_DISPCNT = 0x0403; drawRectMain(0, 0, 240, 160, COLOR_BLACK); drawUIBoxMain(20, 20, 200, 120);
-                drawText("CONGRATULATIONS!", 60, 40, COLOR_GOLD); drawText("YOU SAVED THE ANIME WORLD!", 25, 70, COLOR_WHITE);
+                drawText("SYSTEM:", 60, 40, COLOR_GOLD); drawText("YOU SAVED THE ANIME WORLD!", 25, 70, COLOR_WHITE);
                 drawText("PRESS START TO CONTINUE", 35, 110, COLOR_RED); stateChanged = false;
             }
             if (isKeyJustPressed(KEY_START)) { gameCleared = true; state = 1; stateChanged = true; initOAM(); }
