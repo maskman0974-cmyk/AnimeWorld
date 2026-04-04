@@ -92,7 +92,6 @@ bool eVis = true;
 int typeModifierText = 0; 
 bool passiveTriggered = false;
 
-// MOVE LEARNER GLOBALS
 int learningCharIdx = 0;
 int learningMoveIdx = 0;
 int moveReplaceCursor = 0;
@@ -149,30 +148,34 @@ void drawBar(int x, int y, int w, int h, int val, int max, uint16_t color) {
 }
 
 void drawBattleUI() {
-    drawUIBox(4, 4, 120, 40); 
-    char eL1[32]; sprintf(eL1, "%s:", vijand_team[activeEnemyIdx].naam); drawTextBox(eL1, NULL); // Add colon
+    // Enemy UI (Boven Links - Ruime layout voorkomt overlap)
+    drawUIBox(2, 2, 140, 36); 
+    char eL1[32]; sprintf(eL1, "%s:", vijand_team[activeEnemyIdx].naam); 
+    drawText(eL1, 8, 8, COLOR_WHITE); 
     int eType = getBaseType(vijand_team[activeEnemyIdx].char_id);
-    drawText(typeAfk[eType], 8, 18, getTypeColor(eType));
-    drawText("LVL", 85, 8, COLOR_GOLD); 
-    drawNumber(vijand_team[activeEnemyIdx].lvl, 105, 8, COLOR_GOLD);
+    drawText(typeAfk[eType], 8, 20, getTypeColor(eType));
+    drawText("LVL", 90, 20, COLOR_GOLD); 
+    drawNumber(vijand_team[activeEnemyIdx].lvl, 115, 20, COLOR_GOLD);
     
     uint16_t vColor = BAR_GREEN;
     if (vijand_team[activeEnemyIdx].hp < vijand_team[activeEnemyIdx].max_hp / 2) vColor = BAR_YELLOW;
     if (vijand_team[activeEnemyIdx].hp < vijand_team[activeEnemyIdx].max_hp / 5) vColor = BAR_RED;
-    drawBar(10, 30, 100, 5, vijand_team[activeEnemyIdx].hp, vijand_team[activeEnemyIdx].max_hp, vColor);
+    drawBar(8, 30, 128, 4, vijand_team[activeEnemyIdx].hp, vijand_team[activeEnemyIdx].max_hp, vColor);
     
-    drawUIBox(116, 64, 120, 50); 
-    char pL1[32]; sprintf(pL1, "%s:", team[activeIdx].naam); drawTextBox(pL1, NULL); // Add colon
+    // Player UI (Onder Rechts - Ruime layout voorkomt overlap)
+    drawUIBox(98, 76, 140, 38); 
+    char pL1[32]; sprintf(pL1, "%s:", team[activeIdx].naam); 
+    drawText(pL1, 104, 80, COLOR_WHITE); 
     int pType = getBaseType(team[activeIdx].char_id);
-    drawText(typeAfk[pType], 120, 78, getTypeColor(pType));
-    drawText("LVL", 195, 68, COLOR_GOLD); 
-    drawNumber(team[activeIdx].lvl, 215, 68, COLOR_GOLD);
+    drawText(typeAfk[pType], 104, 92, getTypeColor(pType));
+    drawText("LVL", 186, 92, COLOR_GOLD); 
+    drawNumber(team[activeIdx].lvl, 211, 92, COLOR_GOLD);
     
     uint16_t pColor = BAR_GREEN;
     if (team[activeIdx].hp < team[activeIdx].max_hp / 2) pColor = BAR_YELLOW;
     if (team[activeIdx].hp < team[activeIdx].max_hp / 5) pColor = BAR_RED;
-    drawBar(120, 92, 105, 5, team[activeIdx].hp, team[activeIdx].max_hp, pColor);
-    drawBar(120, 102, 105, 2, team[activeIdx].xp, team[activeIdx].xp_nodig, BAR_BLUE);
+    drawBar(104, 104, 128, 4, team[activeIdx].hp, team[activeIdx].max_hp, pColor);
+    drawBar(104, 110, 128, 2, team[activeIdx].xp, team[activeIdx].xp_nodig, BAR_BLUE);
 }
 
 void drawVFX() {
@@ -192,19 +195,23 @@ void drawVFX() {
     }
 }
 
-void restoreBG(int x, int y, int w, int h) {
+void restoreBG_Rect(int x, int y, int w, int h) {
+    volatile uint16_t* vram = (volatile uint16_t*)0x06000000;
+    const uint16_t* bg = (const uint16_t*)battle_bgBitmap;
     for(int r = 0; r < h; r++) {
+        int rowOffset = (y + r) * 240 + x;
         for(int c = 0; c < w; c++) {
-            if (x + c >= 0 && x + c < 240 && y + r >= 0 && y + r < 160) {
-                drawPixel(x + c, y + r, battle_bgBitmap[(y + r) * 240 + (x + c)]);
-            }
+            vram[rowOffset + c] = bg[rowOffset + c];
         }
     }
 }
 
 void updateAttackAnim() {
     waitVBlank();
-    restoreBG(0, 0, 240, 114);
+    // V3.3 FIX: Deze 3 gerichte wipes raken NOOIT de UI en wissen alles wat beweegt 100% schoon!
+    restoreBG_Rect(144, 0, 96, 75);  // Enemy Zone
+    restoreBG_Rect(0, 40, 96, 80);   // Player Zone
+    restoreBG_Rect(96, 40, 48, 35);  // Center Zone
 
     if (pVis) {
         if (team[activeIdx].char_id == 0 && team[activeIdx].status == 3) {
@@ -215,17 +222,13 @@ void updateAttackAnim() {
                 }
             }
         } else {
-            drawBitmapSprite(24 + pOffX, 56, 64, 64, team[activeIdx].battle_back_bitmap);
+            drawBitmapSprite(24 + pOffX, 40, 64, 64, team[activeIdx].battle_back_bitmap);
         }
     }
 
-    if (eVis) drawBitmapSprite(150 + eOffX, 16, 64, 64, vijand_team[activeEnemyIdx].battle_front_bitmap);
+    if (eVis) drawBitmapSprite(150 + eOffX, 8, 64, 64, vijand_team[activeEnemyIdx].battle_front_bitmap);
 
     drawVFX();
-    
-    if (bState != 10 && bState != 12 && bState != 14) {
-        drawBattleUI();
-    }
 }
 
 void redrawBattleScene() {
@@ -234,6 +237,10 @@ void redrawBattleScene() {
     *(volatile uint32_t*)0x040000D8 = (uint32_t)0x06000000;
     *(volatile uint32_t*)0x040000DC = 0x80000000 | 0x04000000 | 19200; 
 
+    if (bState != 10 && bState != 12 && bState != 14 && bState != 52) {
+        drawBattleUI();
+    }
+
     if (pVis) {
         if (team[activeIdx].char_id == 0 && team[activeIdx].status == 3) {
             const uint16_t* g5_kaart = (const uint16_t*)LuffyG5_cardBitmap;
@@ -243,15 +250,11 @@ void redrawBattleScene() {
                 }
             }
         } else {
-            drawBitmapSprite(24 + pOffX, 56, 64, 64, team[activeIdx].battle_back_bitmap);
+            drawBitmapSprite(24 + pOffX, 40, 64, 64, team[activeIdx].battle_back_bitmap);
         }
     }
 
-    if (eVis) drawBitmapSprite(150 + eOffX, 16, 64, 64, vijand_team[activeEnemyIdx].battle_front_bitmap);
-
-    if (bState != 10 && bState != 12 && bState != 14 && bState != 52) {
-        drawBattleUI();
-    }
+    if (eVis) drawBitmapSprite(150 + eOffX, 8, 64, 64, vijand_team[activeEnemyIdx].battle_front_bitmap);
 }
 
 int calculateDamage(Karakter* attacker, Karakter* defender, Move* m) {
@@ -339,7 +342,7 @@ bool updateBattle() {
     prevState = bState;
 
     if (bState == 0) { 
-        if (stateChanged) drawTextBox("ENEMY TEAM APPROACHES!" : "A WILD ENEMY", "APPEARED!");
+        if (stateChanged) { drawTextBox(bBoss ? "SYSTEM: ENEMY TEAM APPROACHES!" : "SYSTEM: A WILD ENEMY", "APPEARED!"); stateChanged = false; }
         bTimer--;
         if (bTimer <= 0) bState = 1;
     }
@@ -366,7 +369,7 @@ bool updateBattle() {
         }
     }
     else if (bState == 5) { 
-        if (stateChanged) drawTextBox("CHOOSE ATTACK:", ""); 
+        if (stateChanged) drawTextBox("SYSTEM:", "CHOOSE ATTACK"); 
         for(int i = 0; i < 4; i++) {
             uint16_t color = (bMoveSelect == i) ? COLOR_RED : COLOR_WHITE;
             if (strcmp(team[activeIdx].moves[i].naam, "-") != 0) {
@@ -375,25 +378,25 @@ bool updateBattle() {
                 drawText("---", 20 + (i%2)*100, 130 + (i/2)*15, 0x3DEF); 
             }
         }
-        if (isKeyJustPressed(KEY_RIGHT)) { bMoveSelect++; if (bMoveSelect > 3) bMoveSelect = 0; drawTextBox("CHOOSE ATTACK:", ""); }
-        if (isKeyJustPressed(KEY_LEFT))  { bMoveSelect--; if (bMoveSelect < 0) bMoveSelect = 3; drawTextBox("CHOOSE ATTACK:", ""); }
-        if (isKeyJustPressed(KEY_DOWN))  { bMoveSelect += 2; if (bMoveSelect > 3) bMoveSelect -= 4; drawTextBox("CHOOSE ATTACK:", ""); }
-        if (isKeyJustPressed(KEY_UP))    { bMoveSelect -= 2; if (bMoveSelect < 0) bMoveSelect += 4; drawTextBox("CHOOSE ATTACK:", ""); }
+        if (isKeyJustPressed(KEY_RIGHT)) { bMoveSelect++; if (bMoveSelect > 3) bMoveSelect = 0; drawTextBox("SYSTEM:", "CHOOSE ATTACK"); }
+        if (isKeyJustPressed(KEY_LEFT))  { bMoveSelect--; if (bMoveSelect < 0) bMoveSelect = 3; drawTextBox("SYSTEM:", "CHOOSE ATTACK"); }
+        if (isKeyJustPressed(KEY_DOWN))  { bMoveSelect += 2; if (bMoveSelect > 3) bMoveSelect -= 4; drawTextBox("SYSTEM:", "CHOOSE ATTACK"); }
+        if (isKeyJustPressed(KEY_UP))    { bMoveSelect -= 2; if (bMoveSelect < 0) bMoveSelect += 4; drawTextBox("SYSTEM:", "CHOOSE ATTACK"); }
         if (isKeyJustPressed(KEY_A)) {
             if (strcmp(team[activeIdx].moves[bMoveSelect].naam, "-") != 0) { bState = 2; bTimer = 40; }
         }
         if (isKeyJustPressed(KEY_B)) { drawTextBox(NULL,NULL); bState = 1; } 
     }
     else if (bState == 14) { 
-        if (stateChanged) { drawUIBox(10, 10, 220, 100); drawText("BATTLE BAG:", 15, 15, COLOR_GOLD); }
+        if (stateChanged) { drawUIBox(10, 10, 220, 100); drawText("SYSTEM: BATTLE BAG", 15, 15, COLOR_GOLD); }
         for(int i = 0; i < 4; i++) { 
             uint16_t color = (bBagCursor == i) ? COLOR_RED : COLOR_WHITE;
             if (itemAantal[i] <= 0) color = 0x3DEF; 
             drawText(itemNamen[i], 30, 30 + (i * 15), color);
             drawText("x", 170, 30 + (i * 15), color); drawNumber(itemAantal[i], 180, 30 + (i * 15), color);
         }
-        if (isKeyJustPressed(KEY_DOWN)) { bBagCursor = (bBagCursor + 1) % 4; drawUIBox(10, 10, 220, 100); drawText("BATTLE BAG:", 15, 15, COLOR_GOLD); }
-        if (isKeyJustPressed(KEY_UP)) { bBagCursor = (bBagCursor + 3) % 4; drawUIBox(10, 10, 220, 100); drawText("BATTLE BAG:", 15, 15, COLOR_GOLD); }
+        if (isKeyJustPressed(KEY_DOWN)) { bBagCursor = (bBagCursor + 1) % 4; drawUIBox(10, 10, 220, 100); drawText("SYSTEM: BATTLE BAG", 15, 15, COLOR_GOLD); }
+        if (isKeyJustPressed(KEY_UP)) { bBagCursor = (bBagCursor + 3) % 4; drawUIBox(10, 10, 220, 100); drawText("SYSTEM: BATTLE BAG", 15, 15, COLOR_GOLD); }
         if (isKeyJustPressed(KEY_A)) {
             if (itemAantal[bBagCursor] > 0) {
                 if (bBagCursor == 3) { 
@@ -408,11 +411,11 @@ bool updateBattle() {
         if (isKeyJustPressed(KEY_B)) { redrawBattleScene(); bState = 1; }
     }
     else if (bState == 15) { 
-        if (stateChanged) { drawTextBox(team[activeIdx].naam, "RECOVERED HP!"); }
+        if (stateChanged) { char pL1[32]; sprintf(pL1, "%s:", team[activeIdx].naam); drawTextBox(pL1, "RECOVERED HP!"); }
         bTimer--; if (bTimer <= 0) { bState = 3; bTimer = 60; } 
     }
     else if (bState == 7) { 
-        if (stateChanged) { redrawBattleScene(); drawTextBox("YOU THREW A", "CAPTURE NET!"); }
+        if (stateChanged) { redrawBattleScene(); drawTextBox("SYSTEM:", "YOU THREW A CAPTURE NET!"); }
         if (bTimer == 50) { eVis = false; redrawBattleScene(); }
         if (bTimer == 40) { eVis = true; redrawBattleScene(); }
         if (bTimer == 30) { eVis = false; redrawBattleScene(); }
@@ -429,20 +432,21 @@ bool updateBattle() {
     }
     else if (bState == 8) { 
         if (stateChanged) {
-            if (getEmptyPartySlot() != -1) { drawTextBox("GOTCHA! SENT TO", "PARTY!"); team[getEmptyPartySlot()] = vijand_team[activeEnemyIdx]; } 
-            else if (getEmptyPcSlot() != -1) { drawTextBox("GOTCHA! SENT TO", "PC BOX!"); pcBox[getEmptyPcSlot()] = vijand_team[activeEnemyIdx]; } 
-            else { drawTextBox("PC BOX IS FULL!", "RELEASED..."); }
+            if (getEmptyPartySlot() != -1) { drawTextBox("SYSTEM:", "GOTCHA! SENT TO PARTY!"); team[getEmptyPartySlot()] = vijand_team[activeEnemyIdx]; } 
+            else if (getEmptyPcSlot() != -1) { drawTextBox("SYSTEM:", "GOTCHA! SENT TO PC BOX!"); pcBox[getEmptyPcSlot()] = vijand_team[activeEnemyIdx]; } 
+            else { drawTextBox("SYSTEM:", "PC BOX IS FULL! RELEASED..."); }
         }
         bTimer--; if (bTimer <= 0) { return true; }
     }
     else if (bState == 9) { 
-        if (stateChanged) drawTextBox(bBoss ? "SYSTEM:" : "OH NO!", bBoss ? "A BOSS!" : "IT BROKE FREE!"); drawTextBox("OH NO! IT BROKE FREE!", NULL); // Add colon after System
+        if (stateChanged) { drawTextBox("SYSTEM:", bBoss ? "YOU CAN'T CATCH A BOSS!" : "OH NO! IT BROKE FREE!"); stateChanged = false; } 
         bTimer--; if (bTimer <= 0) { bState = 3; bTimer = 40; } 
     }
     else if (bState == 2) { 
         if (stateChanged) {
             passiveTriggered = false; typeModifierText = 0;
-            drawTextBox(team[activeIdx].naam, team[activeIdx].moves[bMoveSelect].naam);
+            char pL1[32]; sprintf(pL1, "%s:", team[activeIdx].naam); 
+            drawTextBox(pL1, team[activeIdx].moves[bMoveSelect].naam);
         }
         
         if (bTimer == 35) { pOffX = 15; updateAttackAnim(); } 
@@ -477,7 +481,7 @@ bool updateBattle() {
                 dynamic_old_vijand_hp--; 
                 dynamic_anim_timer = 0;
                 
-                int x = 10, y = 30, w = 100, h = 5;
+                int x = 8, y = 30, w = 128, h = 4;
                 int max_hp = vijand_team[activeEnemyIdx].max_hp;
                 int hp = dynamic_old_vijand_hp;
                 
@@ -494,15 +498,15 @@ bool updateBattle() {
         }
     }
     else if (bState == 20) { 
-        if (stateChanged) drawTextBox("IT'S SUPER", "EFFECTIVE!");
+        if (stateChanged) drawTextBox("SYSTEM:", "IT'S SUPER EFFECTIVE!");
         bTimer--; if (bTimer <= 0) { bState = 3; bTimer = 60; }
     }
     else if (bState == 21) { 
-        if (stateChanged) drawTextBox("IT'S NOT VERY", "EFFECTIVE...");
+        if (stateChanged) drawTextBox("SYSTEM:", "IT'S NOT VERY EFFECTIVE...");
         bTimer--; if (bTimer <= 0) { bState = 3; bTimer = 60; }
     }
     else if (bState == 22) { 
-        if (stateChanged) drawTextBox("SYSTEM:", "PASSIVE ABILITY TRIGGERED!"); stateChanged = false; // Add colon after System
+        if (stateChanged) { drawTextBox("SYSTEM:", "PASSIVE ABILITY TRIGGERED!"); stateChanged = false; } 
         bTimer--; if (bTimer <= 0) { bState = 3; bTimer = 60; }
     }
     else if (bState == 3) { 
@@ -515,10 +519,10 @@ bool updateBattle() {
             for(int i = activeEnemyIdx + 1; i < 6; i++) { if (vijand_team[i].isGevuld && vijand_team[i].hp > 0) { nextIdx = i; break; } }
             if (nextIdx != -1) {
                 activeEnemyIdx = nextIdx;
-                if (stateChanged) { char enemyL1[32]; sprintf(enemyL1, "ENEMY: FAINTED!"); drawTextBox(enemyL1, vijand_team[activeEnemyIdx].naam); } // Add colon after Enemy
+                if (stateChanged) { char enemyL1[32]; sprintf(enemyL1, "SYSTEM:"); drawTextBox(enemyL1, "ENEMY SENT OUT A NEW FIGHTER"); }
                 bTimer--; if (bTimer <= 0) { drawTextBox(NULL,NULL); bState = 1; redrawBattleScene(); }
             } else {
-                if (stateChanged) drawTextBox("SYSTEM:", "ALL ENEMIES DEFEATED! YOU WIN!"); stateChanged = false; // Add colon after System
+                if (stateChanged) { drawTextBox("SYSTEM:", "ALL ENEMIES DEFEATED! YOU WIN!"); stateChanged = false; }
                 bTimer--; if (bTimer <= 0) { 
                     
                     int participants = 0;
@@ -572,11 +576,11 @@ bool updateBattle() {
                                 if(checkEvolutie(&tE)) { 
                                     teamPending[i].evolution_triggered = true;
                                     strcpy(teamPending[i].evolution_newname, tE.naam);
-                                    // Manual check for luffy Gear 2 evolution logic
-                                    if (tE.char_id == 0 && tempLvl >= 20) { // Assume Luffy Gear 2 at LVL 20
-                                        teamPending[i].evolution_triggered = true;
-                                        strcpy(teamPending[i].evolution_newname, "Luffy Gear 2");
-                                    }
+                                }
+                                // Handmatige Gear 2 trigger
+                                if (tE.char_id == 0 && tempLvl >= 15) { 
+                                    teamPending[i].evolution_triggered = true;
+                                    strcpy(teamPending[i].evolution_newname, "Gear 2 Luffy");
                                 }
                             }
                             
@@ -586,7 +590,10 @@ bool updateBattle() {
                             team[i].max_hp += teamPending[i].max_hp_gain;
                             team[i].hp = team[i].max_hp; 
 
-                            if(teamPending[i].evolution_triggered) checkEvolutie(&team[i]); 
+                            if(teamPending[i].evolution_triggered) {
+                                checkEvolutie(&team[i]); 
+                                justEvolved = true; // Zorgt dat main.c het evolutiescherm laat zien
+                            }
                         }
                     }
                     
@@ -609,7 +616,8 @@ bool updateBattle() {
         } else {
             if (stateChanged) {
                 passiveTriggered = false; typeModifierText = 0;
-                drawTextBox(vijand_team[activeEnemyIdx].naam, vijand_team[activeEnemyIdx].moves[0].naam);
+                char eL1[32]; sprintf(eL1, "%s:", vijand_team[activeEnemyIdx].naam);
+                drawTextBox(eL1, vijand_team[activeEnemyIdx].moves[0].naam);
             }
             
             if (bTimer == 45) { eOffX = -15; updateAttackAnim(); } 
@@ -645,7 +653,7 @@ bool updateBattle() {
                 dynamic_old_active_hp--; 
                 dynamic_anim_timer = 0;
                 
-                int x = 120, y = 92, w = 105, h = 5; 
+                int x = 104, y = 104, w = 128, h = 4; 
                 int max_hp = team[activeIdx].max_hp;
                 int hp = dynamic_old_active_hp;
                 
@@ -661,11 +669,11 @@ bool updateBattle() {
         }
     }
     else if (bState == 30) { 
-        if (stateChanged) drawTextBox("IT'S SUPER", "EFFECTIVE!");
+        if (stateChanged) drawTextBox("SYSTEM:", "IT'S SUPER EFFECTIVE!");
         bTimer--; if (bTimer <= 0) { bState = 4; bTimer = 60; }
     }
     else if (bState == 31) { 
-        if (stateChanged) drawTextBox("IT'S NOT VERY", "EFFECTIVE...");
+        if (stateChanged) drawTextBox("SYSTEM:", "IT'S NOT VERY EFFECTIVE...");
         bTimer--; if (bTimer <= 0) { bState = 4; bTimer = 60; }
     }
     else if (bState == 4) { 
@@ -673,7 +681,8 @@ bool updateBattle() {
             if (team[activeIdx].hp > 0 && team[activeIdx].char_id == 4 && team[activeIdx].hp < team[activeIdx].max_hp) {
                 team[activeIdx].hp += 10;
                 if (team[activeIdx].hp > team[activeIdx].max_hp) team[activeIdx].hp = team[activeIdx].max_hp;
-                drawTextBox(team[activeIdx].naam, "RECOVERED HP!");
+                char pL1[32]; sprintf(pL1, "%s:", team[activeIdx].naam); 
+                drawTextBox(pL1, "RECOVERED HP!");
                 redrawBattleScene();
                 bTimer = 40; 
             } else {
@@ -684,10 +693,10 @@ bool updateBattle() {
         bTimer--;
         if (bTimer <= 0) {
             if (team[activeIdx].hp <= 0) {
-                drawTextBox("SYSTEM:", "YOU FAINTED..."); pVis = false; redrawBattleScene(); // Add colon after System
+                drawTextBox("SYSTEM:", "YOU FAINTED..."); pVis = false; redrawBattleScene(); 
                 if (checkAliveTeam()) { bState = 10; teamSelect = 0; } 
                 else { 
-                    drawTextBox("SYSTEM:", "ALL HEROES FAINTED! GAME OVER..."); // Add colon after System
+                    if (stateChanged) { drawTextBox("SYSTEM:", "ALL HEROES FAINTED! GAME OVER..."); stateChanged = false; }
                     healWholeTeam(); 
                     vijand_team[0].hp = vijand_team[0].max_hp; 
                     return true; 
@@ -697,7 +706,7 @@ bool updateBattle() {
     }
     
     else if (bState == 11) { 
-        if (stateChanged) drawTextBox("SYSTEM:", "TEAM GAINED XP!"); // Add colon after System
+        if (stateChanged) drawTextBox("SYSTEM:", "TEAM GAINED XP!"); 
         
         if (isKeyJustPressed(KEY_A)) {
             dynamic_anim_timer = target_xp;
@@ -707,7 +716,7 @@ bool updateBattle() {
             dynamic_anim_timer += 2; 
             if (dynamic_anim_timer > target_xp) dynamic_anim_timer = target_xp;
             
-            drawBar(120, 102, 105, 2, dynamic_anim_timer, team[activeIdx].xp_nodig, BAR_BLUE);
+            drawBar(104, 110, 128, 2, dynamic_anim_timer, team[activeIdx].xp_nodig, BAR_BLUE);
             
         } else {
             return true; 
@@ -719,12 +728,11 @@ bool updateBattle() {
             redrawBattleScene(); 
             char l2[32];
             sprintf(l2, "HAS REACHED LVL %d!", team[learningCharIdx].lvl); 
-            char characterL1[32]; sprintf(characterL1, "SYSTEM:"); drawTextBox(characterL1, NULL); // Add colon after System
+            char characterL1[32]; sprintf(characterL1, "SYSTEM:"); drawTextBox(characterL1, NULL); 
             drawTextBox(team[learningCharIdx].naam, l2);
         }
         
         if (isKeyJustPressed(KEY_A)) {
-            justEvolved = false; 
             if (teamPending[learningCharIdx].moves_learned_count > 0) {
                 bState = 50; 
                 learningMoveIdx = 0;
@@ -736,7 +744,7 @@ bool updateBattle() {
 
     else if (bState == 50) { 
         if (stateChanged) {
-            char l1[32]; sprintf(l1, "%s WANTS TO LEARN:", team[learningCharIdx].naam); // Add colon after name
+            char l1[32]; sprintf(l1, "%s WANTS TO LEARN:", team[learningCharIdx].naam); 
             drawTextBox(l1, teamPending[learningCharIdx].moves_names[learningMoveIdx]);
         }
         if (isKeyJustPressed(KEY_A)) {
@@ -757,7 +765,7 @@ bool updateBattle() {
     else if (bState == 51) {
         if (stateChanged) {
             char l2[32]; sprintf(l2, "LEARNED %s!", teamPending[learningCharIdx].moves_names[learningMoveIdx]);
-            drawTextBox("SYSTEM:", l2); // Add colon after System
+            drawTextBox("SYSTEM:", l2); 
         }
         if (isKeyJustPressed(KEY_A)) {
             learningMoveIdx++;
@@ -772,7 +780,7 @@ bool updateBattle() {
         if (stateChanged) {
             redrawBattleScene();
             drawUIBox(10, 10, 220, 100); 
-            drawText("SYSTEM:", 15, 15, COLOR_GOLD); // Add colon after System
+            drawText("SYSTEM:", 15, 15, COLOR_GOLD); 
             drawText("FORGET WHICH MOVE?", 15, 25, COLOR_WHITE);
         }
         for(int m=0; m<4; m++) {
@@ -799,7 +807,7 @@ bool updateBattle() {
 
     else if (bState == 10) { 
         if (stateChanged) {
-            drawUIBox(10, 10, 220, 100); drawText("SYSTEM:", 15, 15, COLOR_GOLD); // Add colon after System
+            drawUIBox(10, 10, 220, 100); drawText("SYSTEM:", 15, 15, COLOR_GOLD); 
             drawText("SELECT FIGHTER:", 15, 25, COLOR_WHITE);
         }
         for(int i = 0; i < 6; i++) {
@@ -819,14 +827,14 @@ bool updateBattle() {
     }
     else if (bState == 12) { 
         if (stateChanged) { 
-            char playerL1[32]; sprintf(playerL1, "SYSTEM:"); drawTextBox(playerL1, NULL); // Add colon after System
+            char playerL1[32]; sprintf(playerL1, "SYSTEM:"); drawTextBox(playerL1, NULL); 
             drawTextBox("GO!", team[activeIdx].naam); 
             participated[activeIdx] = true; 
         }
         bTimer--; if (bTimer <= 0) bState = 1;
     }
     else if (bState == 13) {
-        if (stateChanged) drawTextBox("SYSTEM:", "YOU CAN'T RUN FROM A BOSS!"); stateChanged = false; // Add colon after System
+        if (stateChanged) { drawTextBox("SYSTEM:", "YOU CAN'T RUN FROM A BOSS!"); stateChanged = false; } 
         bTimer--; if (bTimer <= 0) { bState = 1; }
     }
 
